@@ -1,0 +1,147 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Inventários{% endblock %}
+{% block page_title %}Inventários{% endblock %}
+
+{% block content %}
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-clipboard-check me-2 text-success"></i>Inventários</h1>
+        <p>Histórico de contagens físicas do estoque</p>
+    </div>
+    <a href="{% url 'inventario_criar' %}" class="btn btn-success">
+        <i class="bi bi-plus-lg me-1"></i> Novo Inventário
+    </a>
+</div>
+
+<!-- Filtro -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="d-flex gap-2">
+            <select name="estado" class="form-select" style="max-width:200px;">
+                <option value="">Todos os estados</option>
+                <option value="0" {% if filtro_estado == '0' %}selected{% endif %}>
+                    ⏳ Em curso
+                </option>
+                <option value="1" {% if filtro_estado == '1' %}selected{% endif %}>
+                    ✔ Concluídos
+                </option>
+            </select>
+            <button type="submit" class="btn btn-outline-secondary">
+                <i class="bi bi-search"></i> Filtrar
+            </button>
+            {% if filtro_estado %}
+                <a href="{% url 'inventario_lista' %}" class="btn btn-outline-danger">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        {% if inventarios %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">#</th>
+                        <th>Data</th>
+                        <th>Responsável</th>
+                        <th class="text-center">Nº Produtos</th>
+                        <th class="text-center">Divergências</th>
+                        <th class="text-center">Estado</th>
+                        <th>Observação</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in inventarios %}
+                    <tr>
+                        <td class="ps-4 text-muted small">{{ inv.pk }}</td>
+                        <td class="fw-semibold">
+                            {{ inv.data_inventario|date:"d/m/Y" }}
+                        </td>
+                        <td class="text-muted small">
+                            {{ inv.utilizador.utilizador|default:inv.utilizador.username }}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border">
+                                {{ inv.itens.count }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            {% with divergencias=inv.itens.all %}
+                                {% with total_div=0 %}
+                                    {# Calcula divergências no template #}
+                                    {% for item in divergencias %}
+                                        {% if item.diferenca != 0 %}
+                                            <span class="badge"
+                                                  style="background:#ffebee;color:#b71c1c;">
+                                                ⚠
+                                            </span>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endwith %}
+                            {% endwith %}
+                        </td>
+                        <td class="text-center">
+                            {% if inv.concluido %}
+                                <span class="badge"
+                                      style="background:#e8f5e9;color:#1b5e20;padding:4px 10px;">
+                                    ✔ Concluído
+                                </span>
+                            {% else %}
+                                <span class="badge"
+                                      style="background:#fff3e0;color:#e65100;padding:4px 10px;">
+                                    ⏳ Em curso
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">
+                            {{ inv.observacao|truncatechars:40|default:"—" }}
+                        </td>
+                        <td class="text-center">
+                            <a href="{% url 'inventario_detalhe' inv.pk %}"
+                               class="btn btn-sm btn-outline-primary"
+                               title="{% if inv.concluido %}Ver detalhe{% else %}Preencher{% endif %}">
+                                <i class="bi bi-{% if inv.concluido %}eye{% else %}pencil{% endif %}"></i>
+                                {% if not inv.concluido %}
+                                    Preencher
+                                {% endif %}
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-clipboard fs-1 d-block mb-3 opacity-25"></i>
+                {% if filtro_estado %}
+                    <p>Nenhum inventário encontrado com este filtro.</p>
+                    <a href="{% url 'inventario_lista' %}"
+                       class="btn btn-outline-secondary btn-sm">
+                        Ver todos
+                    </a>
+                {% else %}
+                    <p>Ainda não foi realizado nenhum inventário.</p>
+                    <a href="{% url 'inventario_criar' %}" class="btn btn-success btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i> Realizar primeiro inventário
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+    {% if inventarios %}
+    <div class="card-footer bg-white text-muted small py-2 px-4">
+        {{ inventarios|length }} inventário{{ inventarios|length|pluralize:",s" }} encontrado{{ inventarios|length|pluralize:",s" }}
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

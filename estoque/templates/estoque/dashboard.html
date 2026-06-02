@@ -1,0 +1,233 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Cabeçalho -->
+<div class="page-header">
+    <h1><i class="bi bi-grid-1x2 me-2 text-success"></i>Dashboard</h1>
+    <p>Visão geral do estoque — {{ mes_atual }}</p>
+</div>
+
+<!-- ═══════════════════════════════
+     CARTÕES DE RESUMO
+════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div style="width:48px;height:48px;border-radius:12px;background:#e8f5e9;
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-box fs-5 text-success"></i>
+                </div>
+                <div>
+                    <div class="fs-3 fw-bold text-dark">{{ total_produtos }}</div>
+                    <div class="text-muted small">Produtos ativos</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div style="width:48px;height:48px;border-radius:12px;background:#e3f2fd;
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-truck fs-5 text-primary"></i>
+                </div>
+                <div>
+                    <div class="fs-3 fw-bold text-dark">{{ total_fornecedores }}</div>
+                    <div class="text-muted small">Fornecedores ativos</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div style="width:48px;height:48px;border-radius:12px;background:#f3e5f5;
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-tags fs-5" style="color:#7b1fa2;"></i>
+                </div>
+                <div>
+                    <div class="fs-3 fw-bold text-dark">{{ total_categorias }}</div>
+                    <div class="text-muted small">Categorias ativas</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100
+                    {% if total_alertas > 0 %}border-start border-danger border-4{% endif %}">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div style="width:48px;height:48px;border-radius:12px;
+                            background:{% if total_alertas > 0 %}#ffebee{% else %}#f5f5f5{% endif %};
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-exclamation-triangle fs-5
+                       {% if total_alertas > 0 %}text-danger{% else %}text-muted{% endif %}"></i>
+                </div>
+                <div>
+                    <div class="fs-3 fw-bold {% if total_alertas > 0 %}text-danger{% else %}text-dark{% endif %}">
+                        {{ total_alertas }}
+                    </div>
+                    <div class="text-muted small">Abaixo do mínimo</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════
+     MOVIMENTAÇÕES DO MÊS
+════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center py-4">
+                <div class="text-success fw-bold fs-2">{{ entradas_mes }}</div>
+                <div class="text-muted small mt-1">
+                    <i class="bi bi-arrow-up-circle me-1 text-success"></i>Entradas este mês
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center py-4">
+                <div class="text-danger fw-bold fs-2">{{ saidas_mes }}</div>
+                <div class="text-muted small mt-1">
+                    <i class="bi bi-arrow-down-circle me-1 text-danger"></i>Saídas este mês
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center py-4">
+                <div class="text-warning fw-bold fs-2">{{ perdas_mes }}</div>
+                <div class="text-muted small mt-1">
+                    <i class="bi bi-x-circle me-1 text-warning"></i>Perdas este mês
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════
+     ALERTAS + ÚLTIMAS MOVIMENTAÇÕES
+════════════════════════════════ -->
+<div class="row g-3">
+
+    <!-- Produtos em alerta -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3">
+                <span class="fw-semibold">
+                    <i class="bi bi-exclamation-triangle text-danger me-2"></i>Alertas de Estoque
+                </span>
+                {% if total_alertas > 5 %}
+                    <span class="badge bg-danger">+{{ total_alertas|add:"-5" }} mais</span>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if produtos_alerta %}
+                    <ul class="list-group list-group-flush">
+                        {% for produto in produtos_alerta %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-3 py-2">
+                            <div>
+                                <div class="fw-semibold small">{{ produto.produto }}</div>
+                                <div class="text-muted" style="font-size:0.78rem;">
+                                    {{ produto.codigo }} · {{ produto.categoria }}
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="text-danger fw-bold small">
+                                    {{ produto.estoque_atual }} {{ produto.get_unidade_display }}
+                                </div>
+                                <div class="text-muted" style="font-size:0.75rem;">
+                                    mín: {{ produto.estoque_minimo }}
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-check-circle fs-2 text-success d-block mb-2"></i>
+                        <small>Todos os produtos estão dentro do limite mínimo.</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Últimas movimentações -->
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3">
+                <span class="fw-semibold">
+                    <i class="bi bi-arrow-left-right text-primary me-2"></i>Últimas Movimentações
+                </span>
+                <a href="#" class="btn btn-sm btn-outline-secondary" style="font-size:0.78rem;">
+                    Ver todas
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if ultimas_movimentacoes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Data</th>
+                                    <th>Tipo</th>
+                                    <th>Produto</th>
+                                    <th class="text-end pe-3">Qtd.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mov in ultimas_movimentacoes %}
+                                <tr>
+                                    <td class="ps-3 text-muted">
+                                        {{ mov.data_movimentacao|date:"d/m H:i" }}
+                                    </td>
+                                    <td>
+                                        {% if mov.tipo_movimentacao == 'ENTRADA' %}
+                                            <span class="badge badge-entrada px-2 py-1">↑ Entrada</span>
+                                        {% elif mov.tipo_movimentacao == 'SAIDA' %}
+                                            <span class="badge badge-saida px-2 py-1">↓ Saída</span>
+                                        {% else %}
+                                            <span class="badge badge-perda px-2 py-1">✘ Perda</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ mov.produto.produto }}</td>
+                                    <td class="text-end pe-3 fw-semibold">
+                                        {{ mov.quantidade }} {{ mov.produto.get_unidade_display }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                        <small>Nenhuma movimentação registada ainda.</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

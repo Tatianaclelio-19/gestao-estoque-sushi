@@ -1,0 +1,128 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Fornecedores{% endblock %}
+{% block page_title %}Fornecedores{% endblock %}
+
+{% block content %}
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-truck me-2 text-success"></i>Fornecedores</h1>
+        <p>Gerir os fornecedores de produtos do restaurante</p>
+    </div>
+    <a href="{% url 'fornecedor_criar' %}" class="btn btn-success">
+        <i class="bi bi-plus-lg me-1"></i> Novo Fornecedor
+    </a>
+</div>
+
+<!-- Pesquisa e Filtro -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="d-flex gap-2 flex-wrap">
+            <input type="text" name="q" value="{{ pesquisa }}"
+                   class="form-control" placeholder="Pesquisar por nome..."
+                   style="max-width:280px;">
+            <select name="ativo" class="form-select" style="max-width:160px;">
+                <option value="">Todos</option>
+                <option value="1" {% if filtro_ativo == '1' %}selected{% endif %}>Apenas ativos</option>
+                <option value="0" {% if filtro_ativo == '0' %}selected{% endif %}>Apenas inativos</option>
+            </select>
+            <button type="submit" class="btn btn-outline-secondary">
+                <i class="bi bi-search"></i> Filtrar
+            </button>
+            {% if pesquisa or filtro_ativo %}
+                <a href="{% url 'fornecedor_lista' %}" class="btn btn-outline-danger">
+                    <i class="bi bi-x-lg"></i> Limpar
+                </a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        {% if fornecedores %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">#</th>
+                        <th>Nome</th>
+                        <th>Telefone</th>
+                        <th>E-mail</th>
+                        <th class="text-center">Qualificado</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in fornecedores %}
+                    <tr>
+                        <td class="ps-4 text-muted small">{{ f.pk }}</td>
+                        <td class="fw-semibold">{{ f.fornecedor }}</td>
+                        <td class="text-muted small">{{ f.telefone|default:"—" }}</td>
+                        <td class="text-muted small">{{ f.email|default:"—" }}</td>
+                        <td class="text-center">
+                            {% if f.fornecedor_qualificado %}
+                                <span style="color:#1565c0;font-weight:bold;">★ Sim</span>
+                            {% else %}
+                                <span class="text-muted">— Não</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if f.status %}
+                                <span class="badge"
+                                      style="background:#e8f5e9;color:#1b5e20;padding:4px 10px;">
+                                    ✔ Ativo
+                                </span>
+                            {% else %}
+                                <span class="badge"
+                                      style="background:#ffebee;color:#b71c1c;padding:4px 10px;">
+                                    ✘ Inativo
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <a href="{% url 'fornecedor_editar' f.pk %}"
+                               class="btn btn-sm btn-outline-primary me-1"
+                               title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'fornecedor_toggle' f.pk %}"
+                               class="btn btn-sm {% if f.status %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                               title="{% if f.status %}Desativar{% else %}Ativar{% endif %}"
+                               onclick="return confirm('{% if f.status %}Desativar{% else %}Ativar{% endif %} o fornecedor {{ f.fornecedor }}?')">
+                                <i class="bi bi-{% if f.status %}toggle-on{% else %}toggle-off{% endif %}"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-truck fs-1 d-block mb-3 opacity-25"></i>
+                {% if pesquisa or filtro_ativo %}
+                    <p>Nenhum fornecedor encontrado com os filtros aplicados.</p>
+                    <a href="{% url 'fornecedor_lista' %}" class="btn btn-outline-secondary btn-sm">
+                        Limpar filtros
+                    </a>
+                {% else %}
+                    <p>Ainda não existem fornecedores registados.</p>
+                    <a href="{% url 'fornecedor_criar' %}" class="btn btn-success btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i> Criar primeiro fornecedor
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+    {% if fornecedores %}
+    <div class="card-footer bg-white text-muted small py-2 px-4">
+        {{ fornecedores|length }} fornecedor{{ fornecedores|length|pluralize:",es" }} encontrado{{ fornecedores|length|pluralize:",s" }}
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,186 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Produtos{% endblock %}
+{% block page_title %}Produtos{% endblock %}
+
+{% block content %}
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-box me-2 text-success"></i>Produtos</h1>
+        <p>Gerir os produtos do estoque do restaurante</p>
+    </div>
+    <a href="{% url 'produto_criar' %}" class="btn btn-success">
+        <i class="bi bi-plus-lg me-1"></i> Novo Produto
+    </a>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-2 align-items-end">
+
+            <div class="col-sm-4 col-lg-3">
+                <input type="text" name="q" value="{{ pesquisa }}"
+                       class="form-control" placeholder="Pesquisar por nome ou código...">
+            </div>
+
+            <div class="col-sm-4 col-lg-2">
+                <select name="categoria" class="form-select">
+                    <option value="">Todas as categorias</option>
+                    {% for cat in categorias %}
+                        <option value="{{ cat.pk }}"
+                            {% if filtro_categoria == cat.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ cat.categoria }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-sm-4 col-lg-2">
+                <select name="fornecedor" class="form-select">
+                    <option value="">Todos os fornecedores</option>
+                    {% for f in fornecedores %}
+                        <option value="{{ f.pk }}"
+                            {% if filtro_fornecedor == f.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ f.fornecedor }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-sm-4 col-lg-2">
+                <select name="ativo" class="form-select">
+                    <option value="1" {% if filtro_ativo == '1' %}selected{% endif %}>Apenas ativos</option>
+                    <option value=""  {% if filtro_ativo == ''  %}selected{% endif %}>Todos</option>
+                    <option value="0" {% if filtro_ativo == '0' %}selected{% endif %}>Apenas inativos</option>
+                </select>
+            </div>
+
+            <div class="col-sm-4 col-lg-2">
+                <select name="alerta" class="form-select">
+                    <option value=""  {% if filtro_alerta == '' %}selected{% endif %}>Todos os saldos</option>
+                    <option value="1" {% if filtro_alerta == '1' %}selected{% endif %}>⚠ Abaixo do mínimo</option>
+                </select>
+            </div>
+
+            <div class="col-sm-4 col-lg-1 d-flex gap-1">
+                <button type="submit" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-search"></i>
+                </button>
+                {% if pesquisa or filtro_categoria or filtro_fornecedor or filtro_alerta or filtro_ativo == '0' %}
+                    <a href="{% url 'produto_lista' %}" class="btn btn-outline-danger">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                {% endif %}
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        {% if produtos %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Código</th>
+                        <th>Nome</th>
+                        <th>Categoria</th>
+                        <th>Fornecedor</th>
+                        <th class="text-center">Unidade</th>
+                        <th class="text-end">Estoque Atual</th>
+                        <th class="text-end">Mínimo</th>
+                        <th class="text-center">Alerta</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in produtos %}
+                    <tr>
+                        <td class="ps-4">
+                            <span class="badge bg-light text-dark border">{{ p.codigo }}</span>
+                        </td>
+                        <td class="fw-semibold">{{ p.produto }}</td>
+                        <td class="text-muted small">{{ p.categoria }}</td>
+                        <td class="text-muted small">{{ p.fornecedor }}</td>
+                        <td class="text-center">
+                            <span class="text-muted small">{{ p.get_unidade_display }}</span>
+                        </td>
+                        <td class="text-end fw-bold
+                            {% if p.abaixo_do_minimo %}text-danger{% else %}text-success{% endif %}">
+                            {{ p.estoque_atual }}
+                        </td>
+                        <td class="text-end text-muted small">{{ p.estoque_minimo }}</td>
+                        <td class="text-center">
+                            {% if p.abaixo_do_minimo %}
+                                <span class="badge"
+                                      style="background:#ffebee;color:#b71c1c;font-size:0.75rem;">
+                                    ⚠ Abaixo
+                                </span>
+                            {% else %}
+                                <span class="badge"
+                                      style="background:#e8f5e9;color:#1b5e20;font-size:0.75rem;">
+                                    ✔ OK
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if p.ativo %}
+                                <span class="badge"
+                                      style="background:#e8f5e9;color:#1b5e20;padding:4px 10px;">
+                                    ✔ Ativo
+                                </span>
+                            {% else %}
+                                <span class="badge"
+                                      style="background:#ffebee;color:#b71c1c;padding:4px 10px;">
+                                    ✘ Inativo
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <a href="{% url 'produto_editar' p.pk %}"
+                               class="btn btn-sm btn-outline-primary me-1" title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'produto_toggle' p.pk %}"
+                               class="btn btn-sm {% if p.ativo %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                               title="{% if p.ativo %}Desativar{% else %}Ativar{% endif %}"
+                               onclick="return confirm('{% if p.ativo %}Desativar{% else %}Ativar{% endif %} o produto {{ p.produto }}?')">
+                                <i class="bi bi-{% if p.ativo %}toggle-on{% else %}toggle-off{% endif %}"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-box fs-1 d-block mb-3 opacity-25"></i>
+                {% if pesquisa or filtro_categoria or filtro_fornecedor or filtro_alerta %}
+                    <p>Nenhum produto encontrado com os filtros aplicados.</p>
+                    <a href="{% url 'produto_lista' %}" class="btn btn-outline-secondary btn-sm">
+                        Limpar filtros
+                    </a>
+                {% else %}
+                    <p>Ainda não existem produtos registados.</p>
+                    <a href="{% url 'produto_criar' %}" class="btn btn-success btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i> Criar primeiro produto
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+    {% if produtos %}
+    <div class="card-footer bg-white text-muted small py-2 px-4">
+        {{ total }} produto{{ total|pluralize:",s" }} encontrado{{ total|pluralize:",s" }}
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

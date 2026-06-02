@@ -1,0 +1,104 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Novo Inventário{% endblock %}
+{% block page_title %}Novo Inventário{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1><i class="bi bi-clipboard-plus me-2 text-success"></i>Novo Inventário</h1>
+    <p>
+        <a href="{% url 'inventario_lista' %}" class="text-decoration-none text-muted">
+            ← Voltar à lista
+        </a>
+    </p>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+                    {% csrf_token %}
+
+                    <div class="mb-4">
+                        <label for="observacao" class="form-label fw-semibold">
+                            Observação <span class="text-muted fw-normal">(opcional)</span>
+                        </label>
+                        <textarea class="form-control" id="observacao" name="observacao"
+                                  rows="3"
+                                  placeholder="Ex.: Inventário mensal de Maio, contagem após feriado...">
+                        </textarea>
+                    </div>
+
+                    <!-- Informação sobre o processo -->
+                    <div class="alert alert-info py-3 mb-4" style="border-radius:10px;">
+                        <h6 class="fw-bold mb-2">
+                            <i class="bi bi-info-circle me-1"></i> O que acontece ao criar?
+                        </h6>
+                        <ul class="small mb-0 ps-3">
+                            <li class="mb-1">
+                                Um inventário em aberto é criado com a data de hoje.
+                            </li>
+                            <li class="mb-1">
+                                Todos os produtos ativos são adicionados automaticamente
+                                com o saldo atual do sistema.
+                            </li>
+                            <li class="mb-1">
+                                O teu papel é corrigir o <strong>saldo físico</strong>
+                                contado fisicamente no armazém.
+                            </li>
+                            <li>
+                                As <strong>divergências</strong> são calculadas automaticamente
+                                ao guardar.
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-clipboard-plus me-1"></i> Criar e iniciar contagem
+                        </button>
+                        <a href="{% url 'inventario_lista' %}"
+                           class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dica lateral -->
+    <div class="col-lg-5 mt-3 mt-lg-0">
+        <div class="card border-0 shadow-sm"
+             style="background:#f8f9fa; border-left:4px solid #66bb6a !important;">
+            <div class="card-body">
+                <h6 class="fw-bold text-success mb-3">
+                    <i class="bi bi-lightbulb me-1"></i> Como funciona o inventário
+                </h6>
+                <div class="small text-muted">
+                    <p class="mb-2">
+                        <strong>1. Criar</strong> — o sistema regista o saldo que tem
+                        em base de dados para cada produto.
+                    </p>
+                    <p class="mb-2">
+                        <strong>2. Contar</strong> — a equipa conta fisicamente
+                        cada produto no armazém e insere a quantidade real.
+                    </p>
+                    <p class="mb-2">
+                        <strong>3. Divergências</strong> — o sistema calcula
+                        automaticamente a diferença entre o saldo do sistema
+                        e o saldo físico contado.
+                    </p>
+                    <p class="mb-0">
+                        <strong>4. Concluir</strong> — após confirmar todos os valores,
+                        o inventário é fechado e fica no histórico.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

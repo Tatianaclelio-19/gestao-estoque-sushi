@@ -1,0 +1,123 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}{{ acao }} Fornecedor{% endblock %}
+{% block page_title %}{{ acao }} Fornecedor{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1><i class="bi bi-truck me-2 text-success"></i>{{ acao }} Fornecedor</h1>
+    <p>
+        <a href="{% url 'fornecedor_lista' %}" class="text-decoration-none text-muted">
+            ← Voltar à lista
+        </a>
+    </p>
+</div>
+
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+                    {% csrf_token %}
+
+                    <!-- Nome -->
+                    <div class="mb-3">
+                        <label for="fornecedor" class="form-label fw-semibold">
+                            Nome do Fornecedor <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="fornecedor"
+                               name="fornecedor"
+                               value="{% if fornecedor %}{{ fornecedor.fornecedor }}{% elif valores %}{{ valores.fornecedor }}{% endif %}"
+                               placeholder="Nome da empresa ou pessoa"
+                               required autofocus>
+                    </div>
+
+                    <div class="row">
+                        <!-- Telefone -->
+                        <div class="col-md-6 mb-3">
+                            <label for="telefone" class="form-label fw-semibold">Telefone</label>
+                            <input type="text" class="form-control" id="telefone"
+                                   name="telefone"
+                                   value="{% if fornecedor %}{{ fornecedor.telefone }}{% elif valores %}{{ valores.telefone }}{% endif %}"
+                                   placeholder="Ex.: +244 923 000 000">
+                        </div>
+
+                        <!-- E-mail -->
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label fw-semibold">E-mail</label>
+                            <input type="email" class="form-control" id="email"
+                                   name="email"
+                                   value="{% if fornecedor %}{{ fornecedor.email }}{% elif valores %}{{ valores.email }}{% endif %}"
+                                   placeholder="email@exemplo.com">
+                        </div>
+                    </div>
+
+                    <!-- Endereço -->
+                    <div class="mb-4">
+                        <label for="endereco" class="form-label fw-semibold">Endereço</label>
+                        <input type="text" class="form-control" id="endereco"
+                               name="endereco"
+                               value="{% if fornecedor %}{{ fornecedor.endereco }}{% elif valores %}{{ valores.endereco }}{% endif %}"
+                               placeholder="Morada completa">
+                    </div>
+
+                    <!-- Switches -->
+                    <div class="mb-4 d-flex gap-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   id="status" name="status"
+                                   {% if fornecedor.status or acao == 'Novo' %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="status">
+                                Fornecedor ativo
+                            </label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   id="fornecedor_qualificado" name="fornecedor_qualificado"
+                                   {% if fornecedor.fornecedor_qualificado %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="fornecedor_qualificado">
+                                Fornecedor qualificado ★
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Botões -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {% if acao == 'Novo' %}Criar Fornecedor{% else %}Guardar Alterações{% endif %}
+                        </button>
+                        <a href="{% url 'fornecedor_lista' %}" class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dica lateral -->
+    <div class="col-lg-4 mt-3 mt-lg-0">
+        <div class="card border-0 shadow-sm"
+             style="background:#f8f9fa;border-left:4px solid #66bb6a !important;">
+            <div class="card-body">
+                <h6 class="fw-bold text-success mb-2">
+                    <i class="bi bi-lightbulb me-1"></i> Dica
+                </h6>
+                <p class="small text-muted mb-2">
+                    O campo <strong>Qualificado</strong> identifica fornecedores
+                    que passaram por uma avaliação formal — útil para priorizar
+                    compras e relatórios de qualidade.
+                </p>
+                <p class="small text-muted mb-0">
+                    Fornecedores <strong>inativos</strong> não aparecem nos
+                    formulários de movimentação mas os seus dados são preservados.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

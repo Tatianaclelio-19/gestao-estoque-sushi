@@ -1,0 +1,287 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Inventário {{ inventario.data_inventario|date:"d/m/Y" }}{% endblock %}
+{% block page_title %}Inventário {{ inventario.data_inventario|date:"d/m/Y" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .linha-divergente { background: #fff8e1; }
+    .linha-ok         { background: #fff;    }
+
+    .input-saldo {
+        width: 110px;
+        text-align: right;
+        font-weight: 600;
+    }
+
+    .diferenca-positiva { color: #1b5e20; font-weight: 700; }
+    .diferenca-negativa { color: #b71c1c; font-weight: 700; }
+    .diferenca-zero     { color: #9e9e9e; }
+
+    /* Barra de progresso no topo */
+    .barra-resumo {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        border: 1px solid #e9ecef;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Cabeçalho -->
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1>
+            <i class="bi bi-clipboard-check me-2 text-success"></i>
+            Inventário — {{ inventario.data_inventario|date:"d/m/Y" }}
+        </h1>
+        <p>
+            <a href="{% url 'inventario_lista' %}" class="text-decoration-none text-muted">
+                ← Voltar à lista
+            </a>
+            &nbsp;·&nbsp;
+            Responsável:
+            <strong>
+                {{ inventario.utilizador.utilizador|default:inventario.utilizador.username }}
+            </strong>
+            &nbsp;·&nbsp;
+            {% if inventario.concluido %}
+                <span style="color:#1b5e20; font-weight:600;">✔ Concluído</span>
+            {% else %}
+                <span style="color:#e65100; font-weight:600;">⏳ Em curso</span>
+            {% endif %}
+        </p>
+    </div>
+
+    {% if not inventario.concluido %}
+    <div class="d-flex gap-2">
+        <button type="submit" form="form-inventario" name="acao" value="guardar"
+                class="btn btn-outline-success">
+            <i class="bi bi-floppy me-1"></i> Guardar
+        </button>
+        <button type="submit" form="form-inventario" name="acao" value="concluir"
+                class="btn btn-success"
+                onclick="return confirm('Concluir o inventário? Esta ação não pode ser desfeita.')">
+            <i class="bi bi-check-circle me-1"></i> Concluir Inventário
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Barra de resumo -->
+<div class="barra-resumo">
+    <div class="row g-3 text-center">
+        <div class="col-6 col-md-3">
+            <div class="fs-3 fw-bold text-dark">{{ total_itens }}</div>
+            <div class="text-muted small">Total de produtos</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="fs-3 fw-bold {% if total_divergente > 0 %}text-warning{% else %}text-success{% endif %}">
+                {{ total_divergente }}
+            </div>
+            <div class="text-muted small">Com divergência</div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="fs-3 fw-bold text-success">
+                {{ total_itens|add:"-"|add:total_divergente }}
+            </div>
+            <div class="text-muted small">Sem divergência</div>
+        </div>
+        <div class="col-6 col-md-3">
+            {% if inventario.observacao %}
+                <div class="small text-muted">
+                    <i class="bi bi-chat-left-text me-1"></i>
+                    {{ inventario.observacao|truncatechars:50 }}
+                </div>
+            {% else %}
+                <div class="text-muted small">Sem observação</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Formulário de preenchimento -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+
+        {% if inventario.concluido %}
+        <!-- MODO LEITURA — inventário concluído -->
+        <div class="table-responsive">
+            <table class="table mb-0 small">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Produto</th>
+                        <th>Categoria</th>
+                        <th class="text-end">Saldo Sistema</th>
+                        <th class="text-end">Saldo Físico</th>
+                        <th class="text-end">Diferença</th>
+                        <th>Observação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itens %}
+                    <tr class="{% if item.diferenca != 0 %}linha-divergente{% else %}linha-ok{% endif %}">
+                        <td class="ps-4">
+                            <div class="fw-semibold">{{ item.produto.produto }}</div>
+                            <div class="text-muted" style="font-size:0.75rem;">
+                                {{ item.produto.codigo }}
+                            </div>
+                        </td>
+                        <td class="text-muted small">{{ item.produto.categoria }}</td>
+                        <td class="text-end">
+                            {{ item.saldo_sistema }} {{ item.produto.get_unidade_display }}
+                        </td>
+                        <td class="text-end fw-semibold">
+                            {{ item.saldo_fisico }} {{ item.produto.get_unidade_display }}
+                        </td>
+                        <td class="text-end">
+                            {% if item.diferenca > 0 %}
+                                <span class="diferenca-positiva">
+                                    +{{ item.diferenca }}
+                                </span>
+                            {% elif item.diferenca < 0 %}
+                                <span class="diferenca-negativa">
+                                    {{ item.diferenca }}
+                                </span>
+                            {% else %}
+                                <span class="diferenca-zero">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">
+                            {{ item.observacao|default:"—" }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% else %}
+        <!-- MODO EDIÇÃO — inventário em curso -->
+        <form method="POST" id="form-inventario">
+            {% csrf_token %}
+
+            <div class="table-responsive">
+                <table class="table mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Produto</th>
+                            <th>Categoria</th>
+                            <th class="text-end">Saldo Sistema</th>
+                            <th class="text-end">Saldo Físico Contado</th>
+                            <th class="text-end" id="col-diferenca">Diferença</th>
+                            <th>Observação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in itens %}
+                        <tr id="linha-{{ item.pk }}"
+                            class="{% if item.diferenca != 0 %}linha-divergente{% else %}linha-ok{% endif %}">
+                            <td class="ps-4">
+                                <div class="fw-semibold">{{ item.produto.produto }}</div>
+                                <div class="text-muted" style="font-size:0.75rem;">
+                                    {{ item.produto.codigo }}
+                                </div>
+                            </td>
+                            <td class="text-muted">{{ item.produto.categoria }}</td>
+                            <td class="text-end fw-semibold">
+                                {{ item.saldo_sistema }}
+                                <span class="text-muted">{{ item.produto.get_unidade_display }}</span>
+                            </td>
+                            <td class="text-end">
+                                <input type="number"
+                                       class="form-control input-saldo d-inline-block"
+                                       name="saldo_fisico_{{ item.pk }}"
+                                       id="fisico-{{ item.pk }}"
+                                       value="{{ item.saldo_fisico }}"
+                                       min="0" step="0.01"
+                                       data-sistema="{{ item.saldo_sistema }}"
+                                       data-pk="{{ item.pk }}"
+                                       oninput="calcularDiferenca({{ item.pk }})">
+                                <span class="text-muted ms-1">
+                                    {{ item.produto.get_unidade_display }}
+                                </span>
+                            </td>
+                            <td class="text-end" id="dif-{{ item.pk }}">
+                                {% if item.diferenca > 0 %}
+                                    <span class="diferenca-positiva">+{{ item.diferenca }}</span>
+                                {% elif item.diferenca < 0 %}
+                                    <span class="diferenca-negativa">{{ item.diferenca }}</span>
+                                {% else %}
+                                    <span class="diferenca-zero">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <input type="text" class="form-control form-control-sm"
+                                       name="obs_{{ item.pk }}"
+                                       value="{{ item.observacao|default:'' }}"
+                                       placeholder="Nota..."
+                                       style="min-width:120px;">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Botões no rodapé do formulário -->
+            <div class="card-footer bg-white d-flex justify-content-between
+                        align-items-center py-3 px-4">
+                <span class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    As diferenças são calculadas em tempo real.
+                    Guarda antes de concluir.
+                </span>
+                <div class="d-flex gap-2">
+                    <button type="submit" name="acao" value="guardar"
+                            class="btn btn-outline-success">
+                        <i class="bi bi-floppy me-1"></i> Guardar progresso
+                    </button>
+                    <button type="submit" name="acao" value="concluir"
+                            class="btn btn-success"
+                            onclick="return confirm('Concluir o inventário? Esta ação não pode ser desfeita.')">
+                        <i class="bi bi-check-circle me-1"></i> Concluir Inventário
+                    </button>
+                </div>
+            </div>
+
+        </form>
+        {% endif %}
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{% if not inventario.concluido %}
+<script>
+    /**
+     * Calcula a diferença em tempo real ao alterar o saldo físico.
+     * Actualiza a cor da linha conforme divergência.
+     */
+    function calcularDiferenca(pk) {
+        const input   = document.getElementById('fisico-' + pk);
+        const sistema = parseFloat(input.dataset.sistema) || 0;
+        const fisico  = parseFloat(input.value)           || 0;
+        const dif     = (fisico - sistema).toFixed(2);
+        const celula  = document.getElementById('dif-'   + pk);
+        const linha   = document.getElementById('linha-' + pk);
+
+        if (parseFloat(dif) > 0) {
+            celula.innerHTML = '<span class="diferenca-positiva">+' + dif + '</span>';
+            linha.className  = 'linha-divergente';
+        } else if (parseFloat(dif) < 0) {
+            celula.innerHTML = '<span class="diferenca-negativa">'  + dif + '</span>';
+            linha.className  = 'linha-divergente';
+        } else {
+            celula.innerHTML = '<span class="diferenca-zero">—</span>';
+            linha.className  = 'linha-ok';
+        }
+    }
+</script>
+{% endif %}
+{% endblock %}

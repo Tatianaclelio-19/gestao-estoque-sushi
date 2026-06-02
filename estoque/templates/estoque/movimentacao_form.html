@@ -1,0 +1,415 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Nova Movimentação{% endblock %}
+{% block page_title %}Nova Movimentação{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Painel de saldo — actualizado via JavaScript */
+    #painel-saldo {
+        display: none;
+        transition: all 0.3s ease;
+    }
+    .tipo-btn {
+        cursor: pointer;
+        border: 2px solid #dee2e6;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        transition: all 0.2s;
+        background: #fff;
+    }
+    .tipo-btn:hover         { border-color: #adb5bd; background: #f8f9fa; }
+    .tipo-btn.selected-ENTRADA { border-color: #2e7d32; background: #e8f5e9; }
+    .tipo-btn.selected-SAIDA   { border-color: #b71c1c; background: #ffebee; }
+    .tipo-btn.selected-PERDA   { border-color: #e65100; background: #fff3e0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1><i class="bi bi-plus-circle me-2 text-success"></i>Nova Movimentação</h1>
+    <p>
+        <a href="{% url 'movimentacao_lista' %}" class="text-decoration-none text-muted">
+            ← Voltar ao histórico
+        </a>
+    </p>
+</div>
+
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST" id="form-movimentacao">
+                    {% csrf_token %}
+
+                    <!-- TIPO DE MOVIMENTAÇÃO -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">
+                            Tipo de Movimentação <span class="text-danger">*</span>
+                        </label>
+                        <input type="hidden" name="tipo_movimentacao"
+                               id="tipo_movimentacao"
+                               value="{{ valores.tipo_movimentacao|default:'' }}">
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <div class="tipo-btn {% if valores.tipo_movimentacao == 'ENTRADA' %}selected-ENTRADA{% endif %}"
+                                     onclick="selecionarTipo('ENTRADA')">
+                                    <i class="bi bi-arrow-up-circle fs-3 text-success d-block mb-1"></i>
+                                    <div class="fw-semibold text-success small">Entrada</div>
+                                    <div class="text-muted" style="font-size:0.72rem;">
+                                        Recepção de mercadoria
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="tipo-btn {% if valores.tipo_movimentacao == 'SAIDA' %}selected-SAIDA{% endif %}"
+                                     onclick="selecionarTipo('SAIDA')">
+                                    <i class="bi bi-arrow-down-circle fs-3 text-danger d-block mb-1"></i>
+                                    <div class="fw-semibold text-danger small">Saída</div>
+                                    <div class="text-muted" style="font-size:0.72rem;">
+                                        Consumo ou venda
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="tipo-btn {% if valores.tipo_movimentacao == 'PERDA' %}selected-PERDA{% endif %}"
+                                     onclick="selecionarTipo('PERDA')">
+                                    <i class="bi bi-x-circle fs-3 text-warning d-block mb-1"></i>
+                                    <div class="fw-semibold text-warning small">Perda</div>
+                                    <div class="text-muted" style="font-size:0.72rem;">
+                                        Vencido ou danificado
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PRODUTO -->
+                    <div class="mb-3">
+                        <label for="produto" class="form-label fw-semibold">
+                            Produto <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="produto" name="produto"
+                                onchange="mostrarSaldo()" required>
+                            <option value="">Selecionar produto...</option>
+                            {% for p in produtos %}
+                                <option value="{{ p.pk }}"
+                                        data-saldo="{{ p.estoque_atual }}"
+                                        data-unidade="{{ p.get_unidade_display }}"
+                                        data-minimo="{{ p.estoque_minimo }}"
+                                        data-custo="{{ p.custo_medio }}"
+                                        {% if valores.produto == p.pk|stringformat:"s" %}selected{% endif %}>
+                                    {{ p.produto }} ({{ p.codigo }})
+                                    — Saldo: {{ p.estoque_atual }} {{ p.get_unidade_display }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- PAINEL DE SALDO — aparece ao selecionar produto -->
+                    <div id="painel-saldo" class="mb-3 p-3 rounded"
+                         style="background:#f8f9fa; border-left: 4px solid #ccc;">
+                        <div class="small text-muted mb-1">Saldo atual do produto</div>
+                        <div class="fs-5 fw-bold" id="saldo-valor">—</div>
+                        <div class="small text-muted mt-1" id="saldo-minimo"></div>
+                    </div>
+
+                    <!-- QUANTIDADE + VALOR UNITÁRIO -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="quantidade" class="form-label fw-semibold">
+                                Quantidade <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" class="form-control" id="quantidade"
+                                   name="quantidade" min="0.01" step="0.01"
+                                   value="{{ valores.quantidade|default:'' }}"
+                                   placeholder="0.00"
+                                   oninput="calcularTotal()" required>
+                        </div>
+                        <div class="col-md-6" id="campo-valor-unitario">
+                            <label for="valor_unitario" class="form-label fw-semibold">
+                                Valor Unitário (€)
+                                <span class="text-muted fw-normal small"
+                                    id="label-valor-info">(obrigatório para entradas)</span>
+                            </label>
+                            <input type="number" class="form-control" id="valor_unitario"
+                                name="valor_unitario" min="0" step="0.01"
+                                value="{{ valores.valor_unitario|default:'0' }}"
+                                placeholder="0.00"
+                                oninput="calcularTotal()">
+                            <div class="form-text" id="texto-valor-unitario">
+                                Introduz o valor de compra por unidade.
+                            </div>
+                            <!-- Mensagem para saída/perda -->
+                            <div class="form-text text-info" id="texto-custo-medio" style="display:none;">
+                                <i class="bi bi-info-circle me-1"></i>
+                                O sistema usará automaticamente o custo médio do produto.
+                            </div>
+                        </div>
+
+                    <!-- VALOR TOTAL — calculado automaticamente -->
+                    <div class="mb-3 p-3 rounded" style="background:#f0f4f8;">
+                        <div class="small text-muted mb-1">Valor total calculado</div>
+                        <div class="fs-5 fw-bold text-primary" id="valor-total-display">
+                            0.00 €
+                        </div>
+                    </div>
+
+                    <!-- FORNECEDOR — só aparece para ENTRADA -->
+                    <div class="mb-3" id="campo-fornecedor" style="display:none;">
+                        <label for="fornecedor" class="form-label fw-semibold">
+                            Fornecedor <span class="text-danger">*</span>
+                            <span class="text-muted fw-normal small">(obrigatório para entradas)</span>
+                        </label>
+                        <select class="form-select" id="fornecedor" name="fornecedor">
+                            <option value="">Selecionar fornecedor...</option>
+                            {% for f in fornecedores %}
+                                <option value="{{ f.pk }}"
+                                    {% if valores.fornecedor == f.pk|stringformat:"s" %}selected{% endif %}>
+                                    {{ f.fornecedor }}
+                                    {% if f.fornecedor_qualificado %}★{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- OBSERVAÇÃO -->
+                    <div class="mb-4">
+                        <label for="observacao" class="form-label fw-semibold">Observação</label>
+                        <textarea class="form-control" id="observacao" name="observacao"
+                                  rows="2"
+                                  placeholder="Ex.: Compra ref. fatura nº 1234, produto danificado na entrega...">{{ valores.observacao|default:'' }}</textarea>
+                    </div>
+
+                    <!-- BOTÕES -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success" id="btn-submeter">
+                            <i class="bi bi-check-lg me-1"></i> Registar Movimentação
+                        </button>
+                        <a href="{% url 'movimentacao_lista' %}"
+                           class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAINEL LATERAL -->
+    <div class="col-lg-4 mt-3 mt-lg-0">
+
+        <!-- Regras de negócio -->
+        <div class="card border-0 shadow-sm mb-3"
+             style="background:#f8f9fa; border-left:4px solid #66bb6a !important;">
+            <div class="card-body">
+                <h6 class="fw-bold text-success mb-3">
+                    <i class="bi bi-lightbulb me-1"></i> Regras importantes
+                </h6>
+                <ul class="small text-muted mb-0 ps-3">
+                    <li class="mb-2">
+                        <strong>Entrada:</strong> requer fornecedor.
+                        Aumenta o saldo do produto.
+                    </li>
+                    <li class="mb-2">
+                        <strong>Saída:</strong> não pode exceder o saldo disponível.
+                        Diminui o saldo.
+                    </li>
+                    <li class="mb-2">
+                        <strong>Perda:</strong> para produtos vencidos, danificados
+                        ou extraviados. Diminui o saldo.
+                    </li>
+                    <li>
+                        O <strong>saldo é actualizado automaticamente</strong>
+                        após o registo.
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Resumo da movimentação -->
+        <div class="card border-0 shadow-sm" id="resumo-card" style="display:none;">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-receipt me-1"></i> Resumo
+                </h6>
+                <table class="table table-sm table-borderless mb-0 small">
+                    <tr>
+                        <td class="text-muted">Tipo</td>
+                        <td class="fw-semibold text-end" id="resumo-tipo">—</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Quantidade</td>
+                        <td class="fw-semibold text-end" id="resumo-quantidade">—</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Saldo após</td>
+                        <td class="fw-semibold text-end" id="resumo-saldo-apos">—</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Valor total</td>
+                        <td class="fw-semibold text-end" id="resumo-valor">—</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ── Estado da página ──
+    let tipoSelecionado = '{{ valores.tipo_movimentacao|default:"" }}';
+    let saldoAtual      = 0;
+    let unidadeAtual    = '';
+
+    // Inicializa se houver valores pré-preenchidos (erro de validação)
+    document.addEventListener('DOMContentLoaded', function () {
+        if (tipoSelecionado) {
+            actualizarUI(tipoSelecionado);
+        }
+        const produtoSelect = document.getElementById('produto');
+        if (produtoSelect.value) {
+            mostrarSaldo();
+        }
+        calcularTotal();
+    });
+
+    // ── Selecionar tipo de movimentação ──
+    function selecionarTipo(tipo) {
+        tipoSelecionado = tipo;
+        document.getElementById('tipo_movimentacao').value = tipo;
+
+        // Remove selecção anterior
+        document.querySelectorAll('.tipo-btn').forEach(btn => {
+            btn.className = 'tipo-btn';
+        });
+
+        // Marca o seleccionado
+        const btns = document.querySelectorAll('.tipo-btn');
+        const idx  = {'ENTRADA': 0, 'SAIDA': 1, 'PERDA': 2}[tipo];
+        if (btns[idx]) btns[idx].classList.add('selected-' + tipo);
+
+        actualizarUI(tipo);
+        actualizarResumo();
+    }
+
+    function actualizarUI(tipo) {
+        const campoFornecedor    = document.getElementById('campo-fornecedor');
+        const fornecedorSelect   = document.getElementById('fornecedor');
+        const inputValor         = document.getElementById('valor_unitario');
+        const textoObrigatorio   = document.getElementById('texto-valor-unitario');
+        const textoCustoMedio    = document.getElementById('texto-custo-medio');
+
+        if (tipo === 'ENTRADA') {
+            // Fornecedor obrigatório
+            campoFornecedor.style.display = 'block';
+            fornecedorSelect.required     = true;
+            // Valor unitário editável
+            inputValor.readOnly           = false;
+            inputValor.style.background   = '';
+            inputValor.style.color        = '';
+            textoObrigatorio.style.display = 'block';
+            textoCustoMedio.style.display  = 'none';
+
+        } else {
+            // Fornecedor oculto
+            campoFornecedor.style.display = 'none';
+            fornecedorSelect.required     = false;
+            fornecedorSelect.value        = '';
+            // Valor unitário bloqueado
+            inputValor.readOnly           = true;
+            inputValor.value              = '0';
+            inputValor.style.background   = '#f8f9fa';
+            inputValor.style.color        = '#6c757d';
+            textoObrigatorio.style.display = 'none';
+            textoCustoMedio.style.display  = 'block';
+        }
+
+        calcularTotal();
+    }
+
+    // ── Mostrar saldo ao selecionar produto ──
+    function mostrarSaldo() {
+        const select  = document.getElementById('produto');
+        const option  = select.options[select.selectedIndex];
+        const painel  = document.getElementById('painel-saldo');
+        const display = document.getElementById('saldo-valor');
+        const minimo  = document.getElementById('saldo-minimo');
+
+        if (!select.value) {
+            painel.style.display = 'none';
+            saldoAtual   = 0;
+            unidadeAtual = '';
+        // Preenche valor unitário com custo médio para saídas e perdas
+        if (tipoSelecionado !== 'ENTRADA') {
+            const custoMedio = parseFloat(option.dataset.custo) || 0;
+            document.getElementById('valor_unitario').value = custoMedio.toFixed(2);
+            calcularTotal();
+        }
+            actualizarResumo();
+            return;
+        }
+
+        saldoAtual   = parseFloat(option.dataset.saldo)  || 0;
+        unidadeAtual = option.dataset.unidade || '';
+        const saldoMinimo = parseFloat(option.dataset.minimo) || 0;
+
+        display.textContent = saldoAtual + ' ' + unidadeAtual;
+        display.className   = 'fs-5 fw-bold ' + (saldoAtual <= saldoMinimo ? 'text-danger' : 'text-success');
+
+        minimo.textContent = 'Mínimo definido: ' + saldoMinimo + ' ' + unidadeAtual;
+        painel.style.borderLeftColor = saldoAtual <= saldoMinimo ? '#c62828' : '#2e7d32';
+        painel.style.display = 'block';
+
+        actualizarResumo();
+    }
+
+    // ── Calcular valor total ──
+    function calcularTotal() {
+        const qtd    = parseFloat(document.getElementById('quantidade').value)      || 0;
+        const valor  = parseFloat(document.getElementById('valor_unitario').value)  || 0;
+        const total  = (qtd * valor).toFixed(2);
+        document.getElementById('valor-total-display').textContent = total + ' €';
+        actualizarResumo();
+    }
+
+    // ── Actualizar painel de resumo ──
+    function actualizarResumo() {
+        const resumo = document.getElementById('resumo-card');
+        const qtd    = parseFloat(document.getElementById('quantidade').value) || 0;
+        const valor  = parseFloat(document.getElementById('valor_unitario').value) || 0;
+
+        if (!tipoSelecionado || !document.getElementById('produto').value) {
+            resumo.style.display = 'none';
+            return;
+        }
+
+        resumo.style.display = 'block';
+
+        const labels = {'ENTRADA': '↑ Entrada', 'SAIDA': '↓ Saída', 'PERDA': '✘ Perda'};
+        const cores  = {'ENTRADA': 'text-success', 'SAIDA': 'text-danger', 'PERDA': 'text-warning'};
+
+        document.getElementById('resumo-tipo').textContent      = labels[tipoSelecionado] || '—';
+        document.getElementById('resumo-tipo').className        = 'fw-semibold text-end ' + (cores[tipoSelecionado] || '');
+        document.getElementById('resumo-quantidade').textContent = qtd + ' ' + unidadeAtual;
+        document.getElementById('resumo-valor').textContent     = (qtd * valor).toFixed(2) + ' €';
+
+        // Saldo após a movimentação
+        let saldoApos = saldoAtual;
+        if (tipoSelecionado === 'ENTRADA') saldoApos = saldoAtual + qtd;
+        if (tipoSelecionado === 'SAIDA')   saldoApos = saldoAtual - qtd;
+        if (tipoSelecionado === 'PERDA')   saldoApos = saldoAtual - qtd;
+
+        const saldoEl = document.getElementById('resumo-saldo-apos');
+        saldoEl.textContent = saldoApos.toFixed(2) + ' ' + unidadeAtual;
+        saldoEl.className   = 'fw-semibold text-end ' + (saldoApos < 0 ? 'text-danger' : 'text-success');
+    }
+</script>
+{% endblock %}

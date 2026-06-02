@@ -1,0 +1,177 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Rectificar Movimentação{% endblock %}
+{% block page_title %}Rectificar Movimentação{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1><i class="bi bi-arrow-repeat me-2 text-warning"></i>Rectificar Movimentação</h1>
+    <p>
+        <a href="{% url 'movimentacao_lista' %}" class="text-decoration-none text-muted">
+            ← Voltar ao histórico
+        </a>
+    </p>
+</div>
+
+<div class="row">
+    <div class="col-lg-7">
+
+        <!-- Dados da movimentação a rectificar -->
+        <div class="card border-0 shadow-sm mb-4"
+             style="border-left: 4px solid #e65100 !important;">
+            <div class="card-body">
+                <h6 class="fw-bold text-warning mb-3">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Movimentação a rectificar — #{{ movimentacao.pk }}
+                </h6>
+                <div class="row g-3 small">
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Tipo</div>
+                        <div class="fw-semibold">
+                            {% if movimentacao.tipo_movimentacao == 'ENTRADA' %}
+                                <span class="badge badge-entrada px-2">↑ Entrada</span>
+                            {% elif movimentacao.tipo_movimentacao == 'SAIDA' %}
+                                <span class="badge badge-saida px-2">↓ Saída</span>
+                            {% else %}
+                                <span class="badge badge-perda px-2">✘ Perda</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Data</div>
+                        <div class="fw-semibold">
+                            {{ movimentacao.data_movimentacao|date:"d/m/Y H:i" }}
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Produto</div>
+                        <div class="fw-semibold">{{ movimentacao.produto.produto }}</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Quantidade</div>
+                        <div class="fw-semibold">
+                            {{ movimentacao.quantidade|floatformat:3 }}
+                            {{ movimentacao.produto.get_unidade_display }}
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Valor Unit.</div>
+                        <div class="fw-semibold">
+                            {{ movimentacao.valor_unitario|floatformat:2 }} €
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Valor Total</div>
+                        <div class="fw-semibold">
+                            {{ movimentacao.valor_total|floatformat:2 }} €
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Registado por</div>
+                        <div class="fw-semibold">
+                            {{ movimentacao.utilizador.utilizador|default:movimentacao.utilizador.username }}
+                        </div>
+                    </div>
+                    {% if movimentacao.fornecedor %}
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Fornecedor</div>
+                        <div class="fw-semibold">{{ movimentacao.fornecedor }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Formulário de rectificação -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+                    {% csrf_token %}
+
+                    <div class="mb-4">
+                        <label for="motivo" class="form-label fw-semibold">
+                            Motivo da Rectificação <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="motivo" name="motivo"
+                                  rows="3" required autofocus
+                                  placeholder="Descreve o erro e o motivo da correcção. Ex.: Valor unitário incorrecto — foi lançado 50€ mas o valor correcto é 10€.">
+                        </textarea>
+                        <div class="form-text">
+                            Este motivo ficará registado no histórico de auditoria.
+                        </div>
+                    </div>
+
+                    <!-- Aviso do que vai acontecer -->
+                    <div class="alert py-3 mb-4"
+                         style="background:#fff8e1; border:1px solid #ffe082;
+                                border-radius:10px;">
+                        <h6 class="fw-bold mb-2" style="color:#e65100;">
+                            <i class="bi bi-info-circle me-1"></i>
+                            O que vai acontecer ao confirmar:
+                        </h6>
+                        <ol class="small mb-0" style="color:#5d4037;">
+                            <li class="mb-1">
+                                A movimentação <strong>#{{ movimentacao.pk }}</strong>
+                                será marcada como <strong>Rectificada</strong> e ficará
+                                visível no histórico.
+                            </li>
+                            <li class="mb-1">
+                                Um <strong>estorno automático</strong> será criado
+                                para anular o efeito no estoque.
+                            </li>
+                            <li class="mb-1">
+                                A acção será <strong>registada no Log</strong>
+                                com o teu utilizador e data/hora.
+                            </li>
+                            <li>
+                                Deverás registar de seguida a
+                                <strong>movimentação correcta</strong>.
+                            </li>
+                        </ol>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-warning fw-semibold"
+                                onclick="return confirm('Confirmas a rectificação da movimentação #{{ movimentacao.pk }}? Esta acção não pode ser desfeita.')">
+                            <i class="bi bi-arrow-repeat me-1"></i>
+                            Confirmar Rectificação
+                        </button>
+                        <a href="{% url 'movimentacao_lista' %}"
+                           class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Painel lateral -->
+    <div class="col-lg-4 mt-3 mt-lg-0">
+        <div class="card border-0 shadow-sm"
+             style="background:#f8f9fa; border-left:4px solid #e65100 !important;">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3" style="color:#e65100;">
+                    <i class="bi bi-shield-lock me-1"></i> Acesso restrito
+                </h6>
+                <p class="small text-muted mb-2">
+                    Esta funcionalidade está disponível apenas para
+                    utilizadores com perfil <strong>Administrador</strong>.
+                </p>
+                <p class="small text-muted mb-2">
+                    Toda a acção fica registada no <strong>Log do sistema</strong>
+                    com data, hora e utilizador responsável.
+                </p>
+                <p class="small text-muted mb-0">
+                    Após a rectificação, regista imediatamente a
+                    movimentação correcta para manter a integridade do estoque.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

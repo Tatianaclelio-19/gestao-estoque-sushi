@@ -1,0 +1,212 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}{{ acao }} Produto{% endblock %}
+{% block page_title %}{{ acao }} Produto{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1><i class="bi bi-box me-2 text-success"></i>{{ acao }} Produto</h1>
+    <p>
+        <a href="{% url 'produto_lista' %}" class="text-decoration-none text-muted">
+            ← Voltar à lista
+        </a>
+    </p>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+                    {% csrf_token %}
+
+                    <!-- Linha 1: Código + Nome -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="codigo" class="form-label fw-semibold">
+                                Código <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="codigo" name="codigo"
+                                  value="{% if produto %}{{ produto.codigo }}{% elif valores %}{{ valores.codigo }}{% endif %}"                              
+                                   placeholder="Ex.: FRG-001"
+                                   required autofocus>
+                        </div>
+                        <div class="col-md-8">
+                            <label for="produto" class="form-label fw-semibold">
+                                Nome do Produto <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="produto" name="produto"
+                                   value="{% if produto %}{{ produto.produto }}{% elif valores %}{{ valores.produto }}{% endif %}"
+                                   placeholder="Ex.: Frango inteiro"
+                                   required>
+                        </div>
+                    </div>
+
+                    <!-- Linha 2: Categoria + Fornecedor -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="categoria" class="form-label fw-semibold">
+                                Categoria <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="categoria" name="categoria" required>
+                                <option value="">Selecionar categoria...</option>
+                                {% for cat in categorias %}
+                                    <option value="{{ cat.pk }}"
+                                        {% if produto.categoria_id == cat.pk %}selected
+                                        {% elif valores.categoria == cat.pk|stringformat:"s" %}selected
+                                        {% endif %}>
+                                        {{ cat.categoria }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="fornecedor" class="form-label fw-semibold">
+                                Fornecedor <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="fornecedor" name="fornecedor" required>
+                                <option value="">Selecionar fornecedor...</option>
+                                {% for f in fornecedores %}
+                                    <option value="{{ f.pk }}"
+                                        {% if produto.fornecedor_id == f.pk %}selected
+                                        {% elif valores.fornecedor == f.pk|stringformat:"s" %}selected
+                                        {% endif %}>
+                                        {{ f.fornecedor }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Linha 3: Unidade + Estoque Mínimo + Custo Médio -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <label for="unidade" class="form-label fw-semibold">
+                                Unidade de Medida <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="unidade" name="unidade" required>
+                                <option value="">Selecionar...</option>
+                                <option value="UN" {% if produto.unidade == 'UN' or valores.unidade == 'UN' %}selected{% endif %}>Unidade</option>
+                                <option value="KG" {% if produto.unidade == 'KG' or valores.unidade == 'KG' %}selected{% endif %}>Quilograma</option>
+                                <option value="LT" {% if produto.unidade == 'LT' or valores.unidade == 'LT' %}selected{% endif %}>Litro</option>
+                                <option value="CX" {% if produto.unidade == 'CX' or valores.unidade == 'CX' %}selected{% endif %}>Caixa</option>
+                                <option value="PC" {% if produto.unidade == 'PC' or valores.unidade == 'PC' %}selected{% endif %}>Pacote</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="estoque_minimo" class="form-label fw-semibold">
+                                Estoque Mínimo
+                            </label>
+                            <input type="number" class="form-control" id="estoque_minimo"
+                                   name="estoque_minimo" min="0" step="0.01"
+                                   value="{% if produto %}{{ produto.estoque_minimo }}{% elif valores %}{{ valores.estoque_minimo}}{% endif %}">
+                            <div class="form-text">Quantidade mínima antes do alerta.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="custo_medio" class="form-label fw-semibold">
+                                Custo Médio (Kz)
+                            </label>
+                            <input type="number" class="form-control" id="custo_medio"
+                                   name="custo_medio" min="0" step="0.01"
+                                   value="{% if produto %}{{ objeto.custo_medio }}{% elif valores %}{{ valores.custo_medio }}{% endif %}">
+
+                            <div class="form-text">Valor médio de compra por unidade.</div>
+                        </div>
+                    </div>
+
+                    <!-- Estoque atual — apenas leitura na edição -->
+                    {% if produto %}
+                    <div class="mb-4 p-3 rounded"
+                         style="background:#f8f9fa;border-left:4px solid
+                         {% if produto.abaixo_do_minimo %}#c62828{% else %}#2e7d32{% endif %};">
+                        <div class="small text-muted mb-1">Estoque atual (atualizado automaticamente)</div>
+                        <div class="fs-4 fw-bold
+                             {% if produto.abaixo_do_minimo %}text-danger{% else %}text-success{% endif %}">
+                            {{ produto.estoque_atual }} {{ produto.get_unidade_display }}
+                            {% if produto.abaixo_do_minimo %}
+                                <span class="fs-6 ms-2">⚠ Abaixo do mínimo</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Switch ativo -->
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   id="ativo" name="ativo"
+                                   {% if produto.ativo or acao == 'Novo' %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="ativo">
+                                Produto ativo
+                            </label>
+                        </div>
+                        <div class="text-muted small mt-1">
+                            Produtos inativos não aparecem nas movimentações.
+                        </div>
+                    </div>
+
+                    <!-- Botões -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {% if acao == 'Novo' %}Criar Produto{% else %}Guardar Alterações{% endif %}
+                        </button>
+                        <a href="{% url 'produto_lista' %}" class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dica lateral -->
+    <div class="col-lg-4 mt-3 mt-lg-0">
+        <div class="card border-0 shadow-sm mb-3"
+             style="background:#f8f9fa;border-left:4px solid #66bb6a !important;">
+            <div class="card-body">
+                <h6 class="fw-bold text-success mb-2">
+                    <i class="bi bi-lightbulb me-1"></i> Dicas
+                </h6>
+                <ul class="small text-muted mb-0 ps-3">
+                    <li class="mb-1">
+                        O <strong>código</strong> deve ser único — use um padrão como
+                        <code>FRG-001</code> para frango.
+                    </li>
+                    <li class="mb-1">
+                        O <strong>estoque atual</strong> é controlado automaticamente
+                        pelas movimentações — não é editável aqui.
+                    </li>
+                    <li class="mb-1">
+                        Defina o <strong>estoque mínimo</strong> para receber alertas
+                        no dashboard quando o saldo for baixo.
+                    </li>
+                    <li>
+                        O <strong>custo médio</strong> é usado para calcular o valor
+                        financeiro do estoque nos relatórios.
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        {% if acao == 'Novo' %}
+        <div class="card border-0 shadow-sm"
+             style="border-left:4px solid #1565c0 !important;">
+            <div class="card-body">
+                <h6 class="fw-bold text-primary mb-2">
+                    <i class="bi bi-info-circle me-1"></i> Atenção
+                </h6>
+                <p class="small text-muted mb-0">
+                    Após criar o produto, regista a quantidade inicial
+                    através de uma <strong>Movimentação de Entrada</strong>.
+                    O estoque começa sempre em zero.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

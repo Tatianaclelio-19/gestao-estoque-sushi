@@ -1,0 +1,87 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}{{ acao }} Categoria{% endblock %}
+{% block page_title %}{{ acao }} Categoria{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1><i class="bi bi-tags me-2 text-success"></i>{{ acao }} Categoria</h1>
+    <p>
+        <a href="{% url 'categoria_lista' %}" class="text-decoration-none text-muted">
+            ← Voltar à lista
+        </a>
+    </p>
+</div>
+
+<div class="row">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+                    {% csrf_token %}
+
+                    <!-- Nome -->
+                    <div class="mb-4">
+                        <label for="categoria" class="form-label fw-semibold">
+                            Nome da Categoria <span class="text-danger">*</span>
+                        </label>
+                        <input type="text"
+                               class="form-control"
+                               id="categoria"
+                               name="categoria"
+                               value="{% if categoria %}{{ categoria.categoria }}{% elif valores %}{{ valores.categoria }}{% endif %}"
+                               placeholder="Ex.: Carnes, Bebidas, Laticínios..."
+                               required autofocus>
+                    </div>
+
+                    <!-- Estado -->
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox"
+                                   id="ativo" name="ativo"
+                                   {% if categoria.ativo or acao == 'Nova' %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="ativo">
+                                Categoria ativa
+                            </label>
+                        </div>
+                        <div class="text-muted small mt-1">
+                            Categorias inativas não aparecem nos formulários de produtos.
+                        </div>
+                    </div>
+
+                    <!-- Botões -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg me-1"></i>
+                            {% if acao == 'Nova' %}Criar Categoria{% else %}Guardar Alterações{% endif %}
+                        </button>
+                        <a href="{% url 'categoria_lista' %}" class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dica lateral -->
+    <div class="col-lg-4 mt-3 mt-lg-0">
+        <div class="card border-0 shadow-sm"
+             style="background:#f8f9fa;border-left:4px solid #66bb6a !important;">
+            <div class="card-body">
+                <h6 class="fw-bold text-success mb-2">
+                    <i class="bi bi-lightbulb me-1"></i> Dica
+                </h6>
+                <p class="small text-muted mb-0">
+                    Agrupa os produtos por tipo para facilitar a gestão.
+                    Exemplos: <strong>Carnes</strong>, <strong>Bebidas</strong>,
+                    <strong>Laticínios</strong>, <strong>Hortifruti</strong>,
+                    <strong>Limpeza</strong>.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Categorias{% endblock %}
+{% block page_title %}Categorias{% endblock %}
+
+{% block content %}
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-tags me-2 text-success"></i>Categorias</h1>
+        <p>Gerir as categorias de produtos do sistema</p>
+    </div>
+    <a href="{% url 'categoria_criar' %}" class="btn btn-success">
+        <i class="bi bi-plus-lg me-1"></i> Nova Categoria
+    </a>
+</div>
+
+<!-- Pesquisa -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="d-flex gap-2">
+            <input type="text" name="q" value="{{ pesquisa }}"
+                   class="form-control" placeholder="Pesquisar por nome..."
+                   style="max-width:320px;">
+            <button type="submit" class="btn btn-outline-secondary">
+                <i class="bi bi-search"></i>
+            </button>
+            {% if pesquisa %}
+                <a href="{% url 'categoria_lista' %}" class="btn btn-outline-danger">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<!-- Tabela -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        {% if categorias %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">#</th>
+                        <th>Nome</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cat in categorias %}
+                    <tr>
+                        <td class="ps-4 text-muted small">{{ cat.pk }}</td>
+                        <td class="fw-semibold">{{ cat.categoria }}</td>
+                        <td class="text-center">
+                            {% if cat.ativo %}
+                                <span class="badge"
+                                      style="background:#e8f5e9;color:#1b5e20;padding:4px 10px;">
+                                    ✔ Ativa
+                                </span>
+                            {% else %}
+                                <span class="badge"
+                                      style="background:#ffebee;color:#b71c1c;padding:4px 10px;">
+                                    ✘ Inativa
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <a href="{% url 'categoria_editar' cat.pk %}"
+                               class="btn btn-sm btn-outline-primary me-1"
+                               title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'categoria_toggle' cat.pk %}"
+                               class="btn btn-sm {% if cat.ativo %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                               title="{% if cat.ativo %}Desativar{% else %}Ativar{% endif %}"
+                               onclick="return confirm('{% if cat.ativo %}Desativar{% else %}Ativar{% endif %} a categoria {{ cat.categoria }}?')">
+                                <i class="bi bi-{% if cat.ativo %}toggle-on{% else %}toggle-off{% endif %}"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-tags fs-1 d-block mb-3 opacity-25"></i>
+                {% if pesquisa %}
+                    <p>Nenhuma categoria encontrada para "<strong>{{ pesquisa }}</strong>".</p>
+                    <a href="{% url 'categoria_lista' %}" class="btn btn-outline-secondary btn-sm">
+                        Limpar pesquisa
+                    </a>
+                {% else %}
+                    <p>Ainda não existem categorias registadas.</p>
+                    <a href="{% url 'categoria_criar' %}" class="btn btn-success btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i> Criar primeira categoria
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+    {% if categorias %}
+    <div class="card-footer bg-white text-muted small py-2 px-4">
+        {{ categorias|length }} categoria{{ categorias|length|pluralize:",s" }} encontrada{{ categorias|length|pluralize:",s" }}
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,283 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Movimentações{% endblock %}
+{% block page_title %}Movimentações{% endblock %}
+
+{% block content %}
+
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-arrow-left-right me-2 text-success"></i>Movimentações</h1>
+        <p>Histórico de entradas, saídas e perdas de estoque</p>
+    </div>
+    <a href="{% url 'movimentacao_criar' %}" class="btn btn-success">
+        <i class="bi bi-plus-lg me-1"></i> Nova Movimentação
+    </a>
+</div>
+
+<!-- ═══════════════════════════════
+     CARTÕES DE TOTAIS DO PERÍODO
+════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div style="width:44px;height:44px;border-radius:10px;background:#e8f5e9;
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-arrow-up-circle fs-5 text-success"></i>
+                </div>
+                <div>
+                    <div class="fs-4 fw-bold text-success">
+                        {{ totais.total_entradas|default:"0" }}
+                    </div>
+                    <div class="text-muted small">Entradas no período</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div style="width:44px;height:44px;border-radius:10px;background:#ffebee;
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-arrow-down-circle fs-5 text-danger"></i>
+                </div>
+                <div>
+                    <div class="fs-4 fw-bold text-danger">
+                        {{ totais.total_saidas|default:"0" }}
+                    </div>
+                    <div class="text-muted small">Saídas no período</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div style="width:44px;height:44px;border-radius:10px;background:#fff3e0;
+                            display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-x-circle fs-5 text-warning"></i>
+                </div>
+                <div>
+                    <div class="fs-4 fw-bold text-warning">
+                        {{ totais.total_perdas|default:"0" }}
+                    </div>
+                    <div class="text-muted small">Perdas no período</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════
+     FILTROS
+════════════════════════════════ -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-2 align-items-end">
+
+            <div class="col-sm-4 col-lg-3">
+                <input type="text" name="q" value="{{ pesquisa }}"
+                       class="form-control" placeholder="Pesquisar produto...">
+            </div>
+
+            <div class="col-sm-4 col-lg-2">
+                <select name="tipo" class="form-select">
+                    <option value="">Todos os tipos</option>
+                    <option value="ENTRADA" {% if filtro_tipo == 'ENTRADA' %}selected{% endif %}>
+                        ↑ Entradas
+                    </option>
+                    <option value="SAIDA" {% if filtro_tipo == 'SAIDA' %}selected{% endif %}>
+                        ↓ Saídas
+                    </option>
+                    <option value="PERDA" {% if filtro_tipo == 'PERDA' %}selected{% endif %}>
+                        ✘ Perdas
+                    </option>
+                </select>
+            </div>
+
+            <div class="col-sm-4 col-lg-2">
+                <select name="mes" class="form-select">
+                    <option value="">Todos os meses</option>
+                    {% for num, nome in meses %}
+                        <option value="{{ num }}"
+                            {% if filtro_mes == num|stringformat:"s" %}selected{% endif %}>
+                            {{ nome }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-sm-4 col-lg-2">
+                <select name="ano" class="form-select">
+                    {% for ano in anos %}
+                        <option value="{{ ano }}"
+                            {% if filtro_ano == ano|stringformat:"s" %}selected{% endif %}>
+                            {{ ano }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-sm-4 col-lg-2 d-flex gap-1">
+                <button type="submit" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-search"></i> Filtrar
+                </button>
+                {% if pesquisa or filtro_tipo or filtro_mes %}
+                    <a href="{% url 'movimentacao_lista' %}" class="btn btn-outline-danger">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                {% endif %}
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     TABELA
+════════════════════════════════ -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        {% if movimentacoes %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 small">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Data</th>
+                        <th>Tipo</th>
+                        <th>Produto</th>
+                        <th class="text-end">Quantidade</th>
+                        <th class="text-end">Valor Unit.</th>
+                        <th class="text-end">Valor Total</th>
+                        <th>Fornecedor</th>
+                        <th>Utilizador</th>
+                        <th>Observação</th>
+                        <th class="text-center">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mov in movimentacoes %}
+                    <tr>
+                        <td class="ps-4 text-muted">
+                            {{ mov.data_movimentacao|date:"d/m/Y H:i" }}
+                        </td>
+                        <td>
+                            {% if mov.tipo_movimentacao == 'ENTRADA' %}
+                                <span class="badge badge-entrada px-2 py-1">↑ Entrada</span>
+                            {% elif mov.tipo_movimentacao == 'SAIDA' %}
+                                <span class="badge badge-saida px-2 py-1">↓ Saída</span>
+                            {% else %}
+                                <span class="badge badge-perda px-2 py-1">✘ Perda</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{{ mov.produto.produto }}</div>
+                            <div class="text-muted" style="font-size:0.75rem;">
+                                {{ mov.produto.codigo }}
+                            </div>
+                        </td>
+                        <td class="text-end fw-semibold">
+                            {{ mov.quantidade }} {{ mov.produto.get_unidade_display }}
+                        </td>
+                        <td class="text-end text-muted">
+                            {% if mov.valor_unitario %}
+                                {{ mov.valor_unitario }} €
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-semibold">
+                            {% if mov.valor_total %}
+                                {{ mov.valor_total }} €
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">
+                            {{ mov.fornecedor.fornecedor|default:"—" }}
+                        </td>
+                        <td class="text-muted">
+                            {{ mov.utilizador.utilizador|default:mov.utilizador.username }}
+                        </td>
+                        <td class="text-muted" style="max-width:150px;">
+                            <span title="{{ mov.observacao }}">
+                                {{ mov.observacao|truncatechars:30|default:"—" }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            {% if mov.rectificada %}
+                                <span class="badge"
+                                    style="background:#ffebee;color:#b71c1c;
+                                            font-size:0.72rem;padding:3px 8px;">
+                                    ✘ Rectificada
+                                </span>
+                            {% elif 'ESTORNO' in mov.observacao %}
+                                <span class="badge"
+                                    style="background:#e3f2fd;color:#1565c0;
+                                            font-size:0.72rem;padding:3px 8px;">
+                                    ↺ Estorno
+                                </span>
+                            {% else %}
+                                {% if request.user.perfil == 'ADMIN' %}
+                                    <a href="{% url 'movimentacao_rectificar' mov.pk %}"
+                                    class="btn btn-sm btn-outline-warning"
+                                    title="Rectificar esta movimentação"
+                                    onclick="return confirm('Rectificar a movimentação #{{ mov.pk }}?')">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </a>
+                                {% else %}
+                                    <span class="badge"
+                                        style="background:#e8f5e9;color:#1b5e20;
+                                                font-size:0.72rem;padding:3px 8px;">
+                                        ✔ OK
+                                    </span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-arrow-left-right fs-1 d-block mb-3 opacity-25"></i>
+                {% if pesquisa or filtro_tipo or filtro_mes %}
+                    <p>Nenhuma movimentação encontrada com os filtros aplicados.</p>
+                    <a href="{% url 'movimentacao_lista' %}"
+                       class="btn btn-outline-secondary btn-sm">
+                        Limpar filtros
+                    </a>
+                {% else %}
+                    <p>Ainda não existem movimentações registadas.</p>
+                    <a href="{% url 'movimentacao_criar' %}" class="btn btn-success btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i> Registar primeira movimentação
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    {% if movimentacoes %}
+    <div class="card-footer bg-white text-muted small py-2 px-4
+                d-flex justify-content-between align-items-center">
+        <span>
+            A mostrar {{ movimentacoes|length }} de {{ total }}
+            movimentação{{ total|pluralize:",ões" }}
+        </span>
+        {% if totais.valor_total %}
+        <span class="fw-semibold">
+            Valor total do período:
+            <strong>{{ totais.valor_total|default:0|floatformat:2 }} €</strong>
+        </span>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

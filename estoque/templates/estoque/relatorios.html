@@ -1,0 +1,470 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Relatórios{% endblock %}
+{% block page_title %}Relatórios{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card-relatorio {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    .secao-titulo {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1b5e20;
+        border-bottom: 2px solid #e8f5e9;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .valor-destaque {
+        font-size: 1.8rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+    .badge-entrada { background:#e8f5e9; color:#1b5e20; }
+    .badge-saida   { background:#ffebee; color:#b71c1c; }
+    .badge-perda   { background:#fff3e0; color:#e65100; }
+    @media print {
+        #sidebar, #topbar, .no-print { display: none !important; }
+        #main-content { margin-left: 0 !important; }
+        .page-content { padding: 0 !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Cabeçalho -->
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-bar-chart-line me-2 text-success"></i>Relatórios</h1>
+        <p>Análise do estoque — {{ nome_mes }} de {{ ano }}</p>
+    </div>
+    <button onclick="window.print()" class="btn btn-outline-secondary no-print">
+        <i class="bi bi-printer me-1"></i> Imprimir
+    </button>
+</div>
+
+<!-- ═══════════════════════════════
+     FILTROS
+════════════════════════════════ -->
+<div class="card card-relatorio mb-4 no-print">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-2 align-items-end">
+
+            <div class="col-sm-4 col-lg-3">
+                <label class="form-label small fw-semibold text-muted">Mês</label>
+                <select name="mes" class="form-select">
+                    {% for num, nome in meses %}
+                        <option value="{{ num }}"
+                            {% if mes == num %}selected{% endif %}>
+                            {{ nome }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-sm-4 col-lg-2">
+                <label class="form-label small fw-semibold text-muted">Ano</label>
+                <select name="ano" class="form-select">
+                    {% for a in anos %}
+                        <option value="{{ a }}"
+                            {% if ano == a %}selected{% endif %}>
+                            {{ a }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-sm-4 col-lg-3">
+                <label class="form-label small fw-semibold text-muted">Categoria</label>
+                <select name="categoria" class="form-select">
+                    <option value="">Todas as categorias</option>
+                    {% for cat in categorias %}
+                        <option value="{{ cat.pk }}"
+                            {% if categoria_id == cat.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ cat.categoria }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-sm-4 col-lg-2 d-flex gap-1">
+                <button type="submit" class="btn btn-success w-100">
+                    <i class="bi bi-search me-1"></i> Gerar
+                </button>
+                {% if categoria_id %}
+                    <a href="{% url 'relatorios' %}?mes={{ mes }}&ano={{ ano }}"
+                       class="btn btn-outline-danger">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                {% endif %}
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     CARTÕES DE RESUMO DO PERÍODO
+════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+    <!-- Entradas -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-relatorio h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <div style="width:40px;height:40px;border-radius:10px;
+                                background:#e8f5e9;display:flex;
+                                align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="bi bi-arrow-up-circle text-success fs-5"></i>
+                    </div>
+                    <div class="text-muted small">Entradas no período</div>
+                </div>
+                <div class="valor-destaque text-success">
+                    {{ resumo.total_entradas|default:"0" }}
+                </div>
+                <div class="text-muted small mt-1">
+                    Valor: {{ resumo.valor_entradas|default:0|floatformat:2 }} €
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Saídas -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-relatorio h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <div style="width:40px;height:40px;border-radius:10px;
+                                background:#ffebee;display:flex;
+                                align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="bi bi-arrow-down-circle text-danger fs-5"></i>
+                    </div>
+                    <div class="text-muted small">Saídas no período</div>
+                </div>
+                <div class="valor-destaque text-danger">
+                    {{ resumo.total_saidas|default:"0" }}
+                </div>
+                <div class="text-muted small mt-1">
+                    Valor: {{ resumo.valor_saidas|default:0|floatformat:2 }} €
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Perdas -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-relatorio h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <div style="width:40px;height:40px;border-radius:10px;
+                                background:#fff3e0;display:flex;
+                                align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="bi bi-x-circle text-warning fs-5"></i>
+                    </div>
+                    <div class="text-muted small">Perdas no período</div>
+                </div>
+                <div class="valor-destaque text-warning">
+                    {{ resumo.total_perdas|default:"0" }}
+                </div>
+                <div class="text-muted small mt-1">
+                    Valor: {{ resumo.valor_perdas|default:0|floatformat:2 }} €
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Valor do estoque -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="card card-relatorio h-100"
+             style="border-left: 4px solid #1b5e20 !important;">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <div style="width:40px;height:40px;border-radius:10px;
+                                background:#e8f5e9;display:flex;
+                                align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class="bi bi-cash-stack text-success fs-5"></i>
+                    </div>
+                    <div class="text-muted small">Valor total do estoque</div>
+                </div>
+                <div class="valor-destaque text-success">
+                    {{ valor_estoque|floatformat:2 }} €
+                </div>
+                <div class="text-muted small mt-1">
+                    Estoque atual × custo médio
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════
+     ALERTAS DE ESTOQUE MÍNIMO
+════════════════════════════════ -->
+{% if produtos_alerta %}
+<div class="card card-relatorio mb-4"
+     style="border-left: 4px solid #b71c1c !important;">
+    <div class="card-body">
+        <div class="secao-titulo" style="color:#b71c1c; border-color:#ffebee;">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Produtos Abaixo do Estoque Mínimo ({{ produtos_alerta|length }})
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 small">
+                <thead class="table-light">
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th class="text-end">Estoque Atual</th>
+                        <th class="text-end">Mínimo</th>
+                        <th class="text-end">Diferença</th>
+                        <th>Fornecedor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in produtos_alerta %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ p.produto }}</div>
+                            <div class="text-muted" style="font-size:0.75rem;">
+                                {{ p.codigo }}
+                            </div>
+                        </td>
+                        <td class="text-muted">{{ p.categoria }}</td>
+                        <td class="text-end text-danger fw-bold">
+                            {{ p.estoque_atual }} {{ p.get_unidade_display }}
+                        </td>
+                        <td class="text-end text-muted">
+                            {{ p.estoque_minimo }} {{ p.get_unidade_display }}
+                        </td>
+                        <td class="text-end text-danger">
+                            {{ p.estoque_atual|add:"-"|add:p.estoque_minimo }}
+                            {{ p.get_unidade_display }}
+                        </td>
+                        <td class="text-muted">{{ p.fornecedor }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+ <!-- ═══════════════════════════════
+     MOVIMENTAÇÕES POR PRODUTO
+════════════════════════════════ -->
+<div class="card card-relatorio mb-4">
+    <div class="card-body">
+        <div class="secao-titulo">
+            <i class="bi bi-box me-2"></i>
+            Movimentações por Produto — {{ nome_mes }} {{ ano }}
+        </div>
+
+        {% if produtos_mov %}
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0 small">
+                <thead class="table-light">
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th class="text-center">Nº Movs.</th>
+                        <th class="text-end">Entradas</th>
+                        <th class="text-end">Saídas</th>
+                        <th class="text-end">Perdas</th>
+                        <th class="text-end">Estoque Atual</th>
+                        <th class="text-end">Valor em Estoque</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in produtos_mov %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ p.produto__produto }}</div>
+                            <div class="text-muted" style="font-size:0.75rem;">
+                                {{ p.produto__codigo }}
+                            </div>
+                        </td>
+                        <td class="text-muted">
+                            {{ p.produto__categoria__categoria }}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border">
+                                {{ p.n_movs }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% if p.qtd_entradas %}
+                                <span class="badge badge-entrada px-2">
+                                    ↑ {{ p.qtd_entradas|floatformat:3 }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if p.qtd_saidas %}
+                                <span class="badge badge-saida px-2">
+                                    ↓ {{ p.qtd_saidas|floatformat:3 }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if p.qtd_perdas %}
+                                <span class="badge badge-perda px-2">
+                                    ✘ {{ p.qtd_perdas|floatformat:3 }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-semibold
+                            {% if p.produto__estoque_atual <= p.produto__estoque_minimo %}
+                                text-danger
+                            {% else %}
+                                text-success
+                            {% endif %}">
+                            {{ p.produto__estoque_atual|floatformat:3 }}
+                        </td>
+                        <td class="text-end text-muted">
+                            {% if p.produto__custo_medio %}
+                                {% widthratio p.produto__estoque_atual 1 p.produto__custo_medio as val_estoque_produto %}
+                                {{ val_estoque_produto|floatformat:2 }} €
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-light fw-semibold">
+                    <tr>
+                        <td colspan="2" class="ps-2">Totais do período</td>
+                        <td class="text-center">—</td>
+                        <td class="text-end text-success">
+                            {{ resumo.total_entradas|default:"0" }}
+                        </td>
+                        <td class="text-end text-danger">
+                            {{ resumo.total_saidas|default:"0" }}
+                        </td>
+                        <td class="text-end text-warning">
+                            {{ resumo.total_perdas|default:"0" }}
+                        </td>
+                        <td class="text-end">—</td>
+                        <td class="text-end">
+                            {{ valor_estoque|default:0|floatformat:2 }} €
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-inbox fs-2 d-block mb-2 opacity-25"></i>
+                <small>
+                    Nenhuma movimentação registada em
+                    {{ nome_mes }} de {{ ano }}.
+                </small>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ═══════════════════════════════
+     PERDAS DO PERÍODO
+════════════════════════════════ -->
+<div class="card card-relatorio mb-4">
+    <div class="card-body">
+        <div class="secao-titulo" style="color:#e65100; border-color:#fff3e0;">
+            <i class="bi bi-x-circle me-2"></i>
+            Perdas — {{ nome_mes }} {{ ano }}
+        </div>
+
+        {% if perdas %}
+        <div class="table-responsive">
+            <table class="table table-sm mb-0 small">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data</th>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th class="text-end">Quantidade</th>
+                        <th class="text-end">Valor Unit.</th>
+                        <th class="text-end">Valor Total</th>
+                        <th>Utilizador</th>
+                        <th>Observação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in perdas %}
+                    <tr>
+                        <td class="text-muted">
+                            {{ p.data_movimentacao|date:"d/m/Y" }}
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{{ p.produto.produto }}</div>
+                            <div class="text-muted" style="font-size:0.75rem;">
+                                {{ p.produto.codigo }}
+                            </div>
+                        </td>
+                        <td class="text-muted">{{ p.produto.categoria }}</td>
+                        <td class="text-end fw-semibold text-warning">
+                            {{ p.quantidade|floatformat:3 }}
+                            {{ p.produto.get_unidade_display }}
+                        </td>
+                        <td class="text-end text-muted">
+                            {% if p.valor_unitario %}
+                                {{ p.valor_unitario|floatformat:2 }} €
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-end fw-semibold">
+                            {% if p.valor_total %}
+                                {{ p.valor_total|floatformat:2 }} €
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="text-muted">
+                            {{ p.utilizador.utilizador|default:p.utilizador.username }}
+                        </td>
+                        <td class="text-muted">
+                            {{ p.observacao|truncatechars:35|default:"—" }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-light fw-semibold">
+                    <tr>
+                        <td colspan="5" class="ps-2">Total de perdas</td>
+                        <td class="text-end text-warning">
+                            {% if resumo.valor_perdas %}
+                                {{ resumo.valor_perdas|default:0|floatformat:2 }} €
+                            {% else %}—{% endif %}
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-check-circle fs-2 d-block mb-2 text-success opacity-50"></i>
+                <small>
+                    Nenhuma perda registada em {{ nome_mes }} de {{ ano }}.
+                </small>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Rodapé de impressão -->
+<div class="text-muted small text-end mt-3" style="font-size:0.75rem;">
+    Relatório gerado em {% now "d/m/Y H:i" %} —
+    Sistema de Gestão de Estoque · Food Fixe Lda.
+</div>
+{% endblock %}

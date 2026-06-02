@@ -1,0 +1,18 @@
+# Ambiente virtual
+venv/
+meuvenv/
+
+# Ficheiros estáticos gerados
+staticfiles/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db
