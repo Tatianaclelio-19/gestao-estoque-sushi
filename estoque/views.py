@@ -959,21 +959,23 @@ def inventario_acerto(request, pk):
         return redirect('inventario_detalhe', pk=pk)
 
     if request.method == 'POST':
-        itens_com_divergencia = inventario.itens.filter(
-            diferenca__isnull=False
-        ).exclude(diferenca=0).select_related('produto')
+        itens_com_divergencia = list(   # ← converte para lista logo aqui
+            inventario.itens.filter(
+                diferenca__isnull=False
+            ).exclude(diferenca=0).select_related('produto')
+        )
 
-        if not itens_com_divergencia.exists():
+        if not itens_com_divergencia:
             messages.info(request, 'Não existem divergências para acertar neste inventário.')
             return redirect('inventario_detalhe', pk=pk)
 
+        produtos_afectados = set()
         movimentacoes_criadas = 0
 
         for item in itens_com_divergencia:
             produto = item.produto
+            produtos_afectados.add(produto)  # ← recolhe aqui, dentro do mesmo loop
 
-            # diferenca > 0 = sobra física → ENTRADA
-            # diferenca < 0 = falta física → SAIDA
             if item.diferenca > 0:
                 tipo = 'ENTRADA'
                 quantidade = item.diferenca
@@ -993,7 +995,33 @@ def inventario_acerto(request, pk):
             )
             movimentacoes_criadas += 1
 
-        # Marca o inventário como acertado
+        # Recalcula o saldo de cada produto afectado
+        from django.db.models import Sum
+        for produto in produtos_afectados:
+            movs_validas = Movimentacao.objects.filter(
+                produto=produto,
+                rectificada=False
+            ).exclude(
+                observacao__startswith='ESTORNO AUTOMÁTICO'
+            )
+
+            entradas = movs_validas.filter(
+                tipo_movimentacao='ENTRADA'
+            ).aggregate(total=Sum('quantidade'))['total'] or Decimal('0.00')
+
+            saidas = movs_validas.filter(
+                tipo_movimentacao='SAIDA'
+            ).aggregate(total=Sum('quantidade'))['total'] or Decimal('0.00')
+
+            perdas = movs_validas.filter(
+                tipo_movimentacao='PERDA'
+            ).aggregate(total=Sum('quantidade'))['total'] or Decimal('0.00')
+
+            Produto.objects.filter(pk=produto.pk).update(
+                estoque_atual=entradas - saidas - perdas
+            )
+
+        # Marca como acertado — remove o bloco duplicado que existia
         inventario.acerto_aplicado = True
         inventario.save()
 

@@ -216,8 +216,6 @@ def atualizar_estoque(sender, instance, **kwargs):
         rectificada=False
     ).exclude(
         observacao__startswith='ESTORNO AUTOMÁTICO'
-    ).exclude(
-        observacao__startswith='Acerto de inventário'
     )
 
     entradas = movs_validas.filter(
@@ -248,6 +246,10 @@ class Inventario(models.Model):
                                         related_name='inventarios')
     data_inventario = models.DateField('Data do inventário', default=timezone.now)
     concluido       = models.BooleanField('Concluído', default=False)
+    acerto_aplicado = models.BooleanField(  
+                      'Acerto aplicado', default=False,
+                      help_text='Indica se o acerto de estoque já foi aplicado.'
+    )
     observacao      = models.TextField('Observação', blank=True)
     create_at       = models.DateTimeField('Criado em', auto_now_add=True)
     update_at       = models.DateTimeField('Atualizado em', auto_now=True)
