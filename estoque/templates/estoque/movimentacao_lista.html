@@ -222,6 +222,12 @@
                                             font-size:0.72rem;padding:3px 8px;">
                                     ↺ Estorno
                                 </span>
+                            {% elif 'Acerto de inventário' in mov.observacao %}
+                                <span class="badge"
+                                    style="background:#f3e5f5;color:#6a1b9a;
+                                            font-size:0.72rem;padding:3px 8px;">
+                                    ⚖ Acerto
+                                </span>
                             {% else %}
                                 {% if request.user.perfil == 'ADMIN' %}
                                     <a href="{% url 'movimentacao_rectificar' mov.pk %}"

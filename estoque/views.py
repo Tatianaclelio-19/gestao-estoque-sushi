@@ -60,6 +60,8 @@ def dashboard(request):
         rectificada=False
     ).exclude(
         observacao__startswith='ESTORNO AUTOMÁTICO'
+    ).exclude(
+        observacao__startswith='Acerto de inventário'
     ).count()
 
     saidas_mes = Movimentacao.objects.filter(
@@ -69,6 +71,8 @@ def dashboard(request):
         rectificada=False
     ).exclude(
         observacao__startswith='ESTORNO AUTOMÁTICO'
+    ).exclude(
+        observacao__startswith='Acerto de inventário'
     ).count()
 
     perdas_mes = Movimentacao.objects.filter(
@@ -78,6 +82,8 @@ def dashboard(request):
         rectificada=False
     ).exclude(
         observacao__startswith='ESTORNO AUTOMÁTICO'
+        ).exclude(
+        observacao__startswith='Acerto de inventário'
     ).count()
 
     ultimas_movimentacoes = Movimentacao.objects.select_related(
@@ -441,6 +447,8 @@ def movimentacao_lista(request):
         rectificada=False
     ).exclude(
         observacao__startswith='ESTORNO AUTOMÁTICO'
+    ).exclude(
+        observacao__startswith='Acerto de inventário'
     )
 
     if pesquisa:
@@ -737,6 +745,8 @@ def relatorios(request):
     rectificada=False,
 ).exclude(
     observacao__startswith='ESTORNO AUTOMÁTICO'
+).exclude(
+    observacao__startswith='Acerto de inventário'
 ).select_related('produto', 'produto__categoria', 'fornecedor', 'utilizador')
 
     if categoria_id:
@@ -921,5 +931,95 @@ def movimentacao_rectificar(request, pk):
 
     return render(request, 'estoque/movimentacao_rectificar.html', {
         'movimentacao': movimentacao,
+    })
+
+@login_required(login_url='login')
+def inventario_acerto(request, pk):
+    """
+    Aplica o acerto de estoque com base nas divergências do inventário.
+    Apenas ADMIN pode executar.
+    Só pode ser aplicado uma vez por inventário.
+    Só funciona em inventários concluídos.
+    """
+    from django.core.exceptions import PermissionDenied
+    from .models import ItemInventario
+
+    if request.user.perfil != 'ADMIN':
+        raise PermissionDenied
+
+    inventario = get_object_or_404(Inventario, pk=pk)
+
+    # Validações
+    if not inventario.concluido:
+        messages.error(request, 'O inventário tem de estar concluído antes de aplicar o acerto.')
+        return redirect('inventario_detalhe', pk=pk)
+
+    if inventario.acerto_aplicado:
+        messages.warning(request, 'O acerto já foi aplicado para este inventário.')
+        return redirect('inventario_detalhe', pk=pk)
+
+    if request.method == 'POST':
+        itens_com_divergencia = inventario.itens.filter(
+            diferenca__isnull=False
+        ).exclude(diferenca=0).select_related('produto')
+
+        if not itens_com_divergencia.exists():
+            messages.info(request, 'Não existem divergências para acertar neste inventário.')
+            return redirect('inventario_detalhe', pk=pk)
+
+        movimentacoes_criadas = 0
+
+        for item in itens_com_divergencia:
+            produto = item.produto
+
+            # diferenca > 0 = sobra física → ENTRADA
+            # diferenca < 0 = falta física → SAIDA
+            if item.diferenca > 0:
+                tipo = 'ENTRADA'
+                quantidade = item.diferenca
+            else:
+                tipo = 'SAIDA'
+                quantidade = abs(item.diferenca)
+
+            Movimentacao.objects.create(
+                utilizador        = request.user,
+                produto           = produto,
+                fornecedor        = None,
+                tipo_movimentacao = tipo,
+                quantidade        = quantidade,
+                valor_unitario    = produto.custo_medio or Decimal('0.00'),
+                observacao        = f'Acerto de inventário #{inventario.pk} — {inventario.data_inventario}',
+                data_movimentacao = timezone.now(),
+            )
+            movimentacoes_criadas += 1
+
+        # Marca o inventário como acertado
+        inventario.acerto_aplicado = True
+        inventario.save()
+
+        # Regista no Log
+        from .models import Log
+        Log.objects.create(
+            utilizador     = request.user,
+            acao           = Log.Acao.EDICAO,
+            tabela_afetada = 'inventario',
+            id_registro    = inventario.pk,
+            dados_antes    = 'acerto_aplicado=False',
+            dados_depois   = f'acerto_aplicado=True, movimentacoes_criadas={movimentacoes_criadas}',
+        )
+
+        messages.success(
+            request,
+            f'Acerto aplicado com sucesso! '
+            f'{movimentacoes_criadas} movimentação(ões) criada(s) automaticamente.'
+        )
+        return redirect('inventario_detalhe', pk=pk)
+
+    # GET — página de confirmação
+    itens_divergentes = inventario.itens.exclude(diferenca=0).select_related('produto')
+
+    return render(request, 'estoque/inventario_acerto.html', {
+        'inventario':       inventario,
+        'itens_divergentes': itens_divergentes,
     })
 

@@ -1,0 +1,213 @@
+{% extends 'estoque/base.html' %}
+
+{% block title %}Acerto de Inventário{% endblock %}
+{% block page_title %}Acerto de Inventário{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1><i class="bi bi-clipboard2-check me-2 text-success"></i>Acerto de Inventário</h1>
+    <p>
+        <a href="{% url 'inventario_detalhe' inventario.pk %}"
+           class="text-decoration-none text-muted">
+            ← Voltar ao inventário
+        </a>
+    </p>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+
+        <!-- Resumo do inventário -->
+        <div class="card border-0 shadow-sm mb-4"
+             style="border-left: 4px solid #1b5e20 !important;">
+            <div class="card-body">
+                <h6 class="fw-bold text-success mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Inventário #{{ inventario.pk }} — {{ inventario.data_inventario|date:"d/m/Y" }}
+                </h6>
+                <div class="row g-2 small">
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Responsável</div>
+                        <div class="fw-semibold">
+                            {{ inventario.utilizador.utilizador|default:inventario.utilizador.username }}
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Total de produtos</div>
+                        <div class="fw-semibold">{{ inventario.itens.count }}</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Com divergência</div>
+                        <div class="fw-semibold text-warning">
+                            {{ itens_divergentes|length }}
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted">Estado</div>
+                        <div class="fw-semibold text-success">✔ Concluído</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de divergências a acertar -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-0">
+                <div class="px-4 py-3 border-bottom">
+                    <h6 class="fw-bold mb-0">
+                        <i class="bi bi-arrow-left-right me-2 text-warning"></i>
+                        Movimentações que serão criadas automaticamente
+                    </h6>
+                </div>
+                {% if itens_divergentes %}
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Produto</th>
+                                <th class="text-end">Saldo Sistema</th>
+                                <th class="text-end">Saldo Físico</th>
+                                <th class="text-end">Diferença</th>
+                                <th class="text-center">Acerto</th>
+                                <th class="text-end">Valor Unit.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in itens_divergentes %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-semibold">{{ item.produto.produto }}</div>
+                                    <div class="text-muted" style="font-size:0.75rem;">
+                                        {{ item.produto.codigo }}
+                                    </div>
+                                </td>
+                                <td class="text-end text-muted">
+                                    {{ item.saldo_sistema|floatformat:3 }}
+                                    {{ item.produto.get_unidade_display }}
+                                </td>
+                                <td class="text-end fw-semibold">
+                                    {{ item.saldo_fisico|floatformat:3 }}
+                                    {{ item.produto.get_unidade_display }}
+                                </td>
+                                <td class="text-end fw-bold
+                                    {% if item.diferenca > 0 %}text-success
+                                    {% else %}text-danger{% endif %}">
+                                    {% if item.diferenca > 0 %}+{% endif %}
+                                    {{ item.diferenca|floatformat:3 }}
+                                </td>
+                                <td class="text-center">
+                                    {% if item.diferenca > 0 %}
+                                        <span class="badge badge-entrada px-2">
+                                            ↑ Entrada
+                                        </span>
+                                    {% else %}
+                                        <span class="badge badge-saida px-2">
+                                            ↓ Saída
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end text-muted">
+                                    {{ item.produto.custo_medio|floatformat:2 }} €
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-check-circle fs-2 text-success d-block mb-2"></i>
+                        <small>Não existem divergências para acertar.</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Aviso e botão de confirmação -->
+        {% if itens_divergentes %}
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+
+                <div class="alert py-3 mb-4"
+                     style="background:#fff8e1; border:1px solid #ffe082; border-radius:10px;">
+                    <h6 class="fw-bold mb-2" style="color:#e65100;">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Atenção — esta acção não pode ser desfeita
+                    </h6>
+                    <ul class="small mb-0" style="color:#5d4037;">
+                        <li class="mb-1">
+                            Serão criadas <strong>{{ itens_divergentes|length }}
+                            movimentação(ões)</strong> automaticamente.
+                        </li>
+                        <li class="mb-1">
+                            Cada movimentação usará o <strong>custo médio</strong>
+                            do produto como valor unitário.
+                        </li>
+                        <li class="mb-1">
+                            Não será associado nenhum fornecedor
+                            (acerto interno).
+                        </li>
+                        <li>
+                            O inventário ficará marcado como
+                            <strong>Acerto Aplicado</strong> e este botão
+                            desaparecerá.
+                        </li>
+                    </ul>
+                </div>
+
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success fw-semibold"
+                                onclick="return confirm('Confirmas a aplicação do acerto? Esta acção não pode ser desfeita.')">
+                            <i class="bi bi-clipboard2-check me-1"></i>
+                            Confirmar e Aplicar Acerto
+                        </button>
+                        <a href="{% url 'inventario_detalhe' inventario.pk %}"
+                           class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Painel lateral -->
+    <div class="col-lg-3 mt-3 mt-lg-0">
+        <div class="card border-0 shadow-sm"
+             style="background:#f8f9fa; border-left:4px solid #1b5e20 !important;">
+            <div class="card-body">
+                <h6 class="fw-bold text-success mb-3">
+                    <i class="bi bi-lightbulb me-1"></i> Como funciona
+                </h6>
+                <ul class="small text-muted mb-0 ps-3">
+                    <li class="mb-2">
+                        <strong>Sobra física</strong> (diferença positiva)
+                        → cria uma <span class="text-success fw-semibold">Entrada</span>
+                        para repor o saldo.
+                    </li>
+                    <li class="mb-2">
+                        <strong>Falta física</strong> (diferença negativa)
+                        → cria uma <span class="text-danger fw-semibold">Saída</span>
+                        para corrigir o saldo.
+                    </li>
+                    <li class="mb-2">
+                        O valor usa sempre o <strong>custo médio</strong>
+                        do produto.
+                    </li>
+                    <li>
+                        A observação de cada movimentação referencia
+                        automaticamente este inventário.
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

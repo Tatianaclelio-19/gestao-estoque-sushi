@@ -216,6 +216,8 @@ def atualizar_estoque(sender, instance, **kwargs):
         rectificada=False
     ).exclude(
         observacao__startswith='ESTORNO AUTOMÁTICO'
+    ).exclude(
+        observacao__startswith='Acerto de inventário'
     )
 
     entradas = movs_validas.filter(

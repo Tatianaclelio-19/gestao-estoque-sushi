@@ -38,6 +38,7 @@ urlpatterns = [
     path('inventarios/novo/',              views.inventario_criar,    name='inventario_criar'),
     path('inventarios/<int:pk>/',          views.inventario_detalhe,  name='inventario_detalhe'),
     path('inventarios/<int:pk>/concluir/', views.inventario_concluir, name='inventario_concluir'),
+    path('inventarios/<int:pk>/acerto/', views.inventario_acerto, name='inventario_acerto'),
 
     # --- Relatórios ---
     path('relatorios/',                    views.relatorios,          name='relatorios'),
