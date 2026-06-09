@@ -280,6 +280,8 @@ class ItemInventario(models.Model):
     diferenca       = models.DecimalField('Diferença', max_digits=10,
                                           decimal_places=2, default=Decimal('0.00'),
                                           editable=False)  # calculado no save()
+    acerto_aplicado = models.BooleanField('Acerto aplicado', default=False,
+                                          help_text='Indica se o acerto de estoque já foi aplicado para este inventário.')
     observacao      = models.TextField('Observação', blank=True)
     create_at       = models.DateTimeField('Criado em', auto_now_add=True)
 
