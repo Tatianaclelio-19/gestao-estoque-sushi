@@ -109,9 +109,10 @@ class Produto(models.Model):
     categoria       = models.ForeignKey(Categoria, on_delete=models.PROTECT,
                                         verbose_name='Categoria',
                                         related_name='produtos')
-    fornecedor      = models.ForeignKey(Fornecedor, on_delete=models.PROTECT,
-                                        verbose_name='Fornecedor',
-                                        related_name='produtos')
+    fornecedor      = models.ForeignKey(Fornecedor, on_delete=models.SET_NULL,
+                                    verbose_name='Fornecedor',
+                                    related_name='produtos',
+                                    null=True, blank=True)
     unidade         = models.CharField('Unidade de medida', max_length=5,
                                        choices=Unidade.choices,
                                        default=Unidade.UNIDADE)
@@ -120,7 +121,8 @@ class Produto(models.Model):
     estoque_minimo  = models.DecimalField('Estoque mínimo', max_digits=10,
                                           decimal_places=2, default=Decimal('0.00'))
     custo_medio     = models.DecimalField('Custo médio', max_digits=10,
-                                          decimal_places=2, default=Decimal('0.00'))
+                                          decimal_places=2, default=Decimal('0.00'),
+                                          null=True, blank=True)
     ativo           = models.BooleanField('Ativo', default=True)
     create_at       = models.DateTimeField('Criado em', auto_now_add=True)
     update_at       = models.DateTimeField('Atualizado em', auto_now=True)
@@ -137,6 +139,56 @@ class Produto(models.Model):
     def abaixo_do_minimo(self):
         """Retorna True se o estoque atual estiver abaixo do mínimo."""
         return self.estoque_atual <= self.estoque_minimo
+
+class LoteEstoque(models.Model):
+    """
+    Regista cada lote de entrada de um produto.
+    Usado pelo sistema PEPS para controlar a ordem de consumo.
+    O operador nunca interage directamente com esta tabela.
+    """
+    produto              = models.ForeignKey(
+                               Produto,
+                               on_delete=models.PROTECT,
+                               verbose_name='Produto',
+                               related_name='lotes'
+                           )
+    movimentacao_origem  = models.ForeignKey(
+                               'Movimentacao',
+                               on_delete=models.PROTECT,
+                               verbose_name='Movimentação de origem',
+                               related_name='lotes_criados',
+                               help_text='Entrada que criou este lote'
+                           )
+    quantidade_inicial   = models.DecimalField(
+                               'Quantidade inicial', max_digits=10, decimal_places=3
+                           )
+    quantidade_restante  = models.DecimalField(
+                               'Quantidade restante', max_digits=10, decimal_places=3
+                           )
+    valor_unitario       = models.DecimalField(
+                               'Valor unitário', max_digits=10, decimal_places=2
+                           )
+    data_entrada         = models.DateTimeField(
+                               'Data de entrada', default=timezone.now
+                           )
+    esgotado             = models.BooleanField(
+                               'Esgotado', default=False
+                           )
+    create_at            = models.DateTimeField('Criado em', auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Lote de Estoque'
+        verbose_name_plural = 'Lotes de Estoque'
+        ordering            = ['produto', 'data_entrada']  # PEPS — mais antigo primeiro
+
+    def __str__(self):
+        return (
+            f'{self.produto.produto} | '
+            f'Lote {self.pk} | '
+            f'{self.quantidade_restante}/{self.quantidade_inicial} '
+            f'{self.produto.get_unidade_display()} | '
+            f'{self.valor_unitario}€'
+        )
 
 
 # =============================================================================
@@ -208,31 +260,72 @@ class Movimentacao(models.Model):
 
 @receiver(post_save, sender=Movimentacao)
 def atualizar_estoque(sender, instance, **kwargs):
+    """
+    Signal que:
+    1. Se for ENTRADA — cria um novo LoteEstoque
+    2. Se for SAIDA ou PERDA — consome lotes pela ordem PEPS
+    3. Actualiza o estoque_atual do produto
+    """
+    from .models import LoteEstoque
+
     produto = instance.produto
 
-    # Exclui movimentações rectificadas e estornos do cálculo
-    movs_validas = Movimentacao.objects.filter(
-        produto=produto,
-        rectificada=False
-    ).exclude(
-        observacao__startswith='ESTORNO AUTOMÁTICO'
-    )
+    # --- ENTRADA: cria novo lote ---
+    if instance.tipo_movimentacao == Movimentacao.Tipo.ENTRADA:
+        # Só cria lote se não for estorno nem rectificada
+        if (not instance.rectificada and
+                not instance.observacao.startswith('ESTORNO AUTOMÁTICO')):
+            # Verifica se o lote já foi criado (evita duplicação no signal)
+            if not LoteEstoque.objects.filter(movimentacao_origem=instance).exists():
+                LoteEstoque.objects.create(
+                    produto             = produto,
+                    movimentacao_origem = instance,
+                    quantidade_inicial  = instance.quantidade,
+                    quantidade_restante = instance.quantidade,
+                    valor_unitario      = instance.valor_unitario,
+                    data_entrada        = instance.data_movimentacao,
+                )
 
-    entradas = movs_validas.filter(
-        tipo_movimentacao=Movimentacao.Tipo.ENTRADA
-    ).aggregate(total=models.Sum('quantidade'))['total'] or Decimal('0.00')
+    # --- SAIDA ou PERDA: consome lotes PEPS ---
+    elif instance.tipo_movimentacao in (
+        Movimentacao.Tipo.SAIDA, Movimentacao.Tipo.PERDA
+    ):
+        if (not instance.rectificada and
+                not instance.observacao.startswith('ESTORNO AUTOMÁTICO')):
+            quantidade_a_consumir = instance.quantidade
 
-    saidas = movs_validas.filter(
-        tipo_movimentacao=Movimentacao.Tipo.SAIDA
-    ).aggregate(total=models.Sum('quantidade'))['total'] or Decimal('0.00')
+            # Busca lotes disponíveis do mais antigo para o mais novo (PEPS)
+            lotes = LoteEstoque.objects.filter(
+                produto  = produto,
+                esgotado = False,
+            ).order_by('data_entrada')
 
-    perdas = movs_validas.filter(
-        tipo_movimentacao=Movimentacao.Tipo.PERDA
-    ).aggregate(total=models.Sum('quantidade'))['total'] or Decimal('0.00')
+            for lote in lotes:
+                if quantidade_a_consumir <= Decimal('0.00'):
+                    break
 
-    Produto.objects.filter(pk=produto.pk).update(
-        estoque_atual=entradas - saidas - perdas
-    )
+                if lote.quantidade_restante <= quantidade_a_consumir:
+                    # Consome o lote inteiro
+                    quantidade_a_consumir -= lote.quantidade_restante
+                    lote.quantidade_restante = Decimal('0.00')
+                    lote.esgotado            = True
+                    lote.save()
+                else:
+                    # Consome parcialmente
+                    lote.quantidade_restante -= quantidade_a_consumir
+                    quantidade_a_consumir     = Decimal('0.00')
+                    lote.save()
+
+    # --- Recalcula estoque_atual a partir dos lotes activos ---
+    from django.db.models import Sum as DjSum
+    saldo = LoteEstoque.objects.filter(
+        produto  = produto,
+        esgotado = False,
+    ).aggregate(
+        total=DjSum('quantidade_restante')
+    )['total'] or Decimal('0.00')
+
+    Produto.objects.filter(pk=produto.pk).update(estoque_atual=saldo)
 
 
 # =============================================================================
@@ -246,10 +339,8 @@ class Inventario(models.Model):
                                         related_name='inventarios')
     data_inventario = models.DateField('Data do inventário', default=timezone.now)
     concluido       = models.BooleanField('Concluído', default=False)
-    acerto_aplicado = models.BooleanField(  
-                      'Acerto aplicado', default=False,
-                      help_text='Indica se o acerto de estoque já foi aplicado.'
-    )
+    acerto_aplicado = models.BooleanField('Acerto aplicado', default=False,
+                                          help_text='Indica se o acerto de estoque já foi aplicado para este inventário.')
     observacao      = models.TextField('Observação', blank=True)
     create_at       = models.DateTimeField('Criado em', auto_now_add=True)
     update_at       = models.DateTimeField('Atualizado em', auto_now=True)
@@ -284,8 +375,7 @@ class ItemInventario(models.Model):
     diferenca       = models.DecimalField('Diferença', max_digits=10,
                                           decimal_places=2, default=Decimal('0.00'),
                                           editable=False)  # calculado no save()
-    acerto_aplicado = models.BooleanField('Acerto aplicado', default=False,
-                                          help_text='Indica se o acerto de estoque já foi aplicado para este inventário.')
+    
     observacao      = models.TextField('Observação', blank=True)
     create_at       = models.DateTimeField('Criado em', auto_now_add=True)
 

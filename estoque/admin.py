@@ -3,7 +3,8 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
 from .models import (
     Utilizador, Categoria, Fornecedor, Produto,
-    Movimentacao, Inventario, ItemInventario, Log
+    Movimentacao, Inventario, ItemInventario, Log,
+    LoteEstoque 
 )
 
 
@@ -214,6 +215,13 @@ class MovimentacaoAdmin(admin.ModelAdmin):
             cor_fundo, cor_texto, label
         )
 
+    @admin.register(LoteEstoque)
+    class LoteEstoqueAdmin(admin.ModelAdmin):
+        list_display  = ('produto', 'quantidade_inicial', 'quantidade_restante',
+                        'valor_unitario', 'data_entrada', 'esgotado')
+        list_filter   = ('produto', 'esgotado')
+        ordering      = ('produto', 'data_entrada')
+        readonly_fields = ('create_at',)
 
 # =============================================================================
 # ITEM DE INVENTÁRIO — inline dentro do Inventário

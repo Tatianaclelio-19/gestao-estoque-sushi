@@ -195,7 +195,7 @@
                     {{ valor_estoque|floatformat:2 }} €
                 </div>
                 <div class="text-muted small mt-1">
-                    Estoque atual × custo médio
+                    Valor real por lotes (PEPS)
                 </div>
             </div>
         </div>
@@ -335,8 +335,8 @@
                         </td>
                         <td class="text-end text-muted">
                             {% if p.produto__custo_medio %}
-                                {% widthratio p.produto__estoque_atual 1 p.produto__custo_medio as val_estoque_produto %}
-                                {{ val_estoque_produto|floatformat:2 }} €
+                                {% widthratio p.produto__estoque_atual 1 p.produto__custo_medio as val_est %}
+                                {{ val_est|floatformat:2 }} €
                             {% else %}
                                 —
                             {% endif %}

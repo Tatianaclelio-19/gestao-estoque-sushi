@@ -3,10 +3,14 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Sum, Q, Count, F, ExpressionWrapper, DecimalField
+from django.db.models import Sum as DjSum
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
-from .models import Produto, Movimentacao, Inventario, Fornecedor, Categoria
 from decimal import Decimal
+from .models import (
+    Produto, Movimentacao, Inventario, Fornecedor,
+    Categoria, LoteEstoque, ItemInventario, Log
+)
 
 
 
@@ -321,16 +325,10 @@ def produto_criar(request):
         ativo          = request.POST.get('ativo') == 'on'
 
         erros = []
-        if not codigo:
-            erros.append('O código do produto é obrigatório.')
-        if not nome:
-            erros.append('O nome do produto é obrigatório.')
-        if not categoria:
-            erros.append('A categoria é obrigatória.')
-        if not fornecedor:
-            erros.append('O fornecedor é obrigatório.')
-        if not unidade:
-            erros.append('A unidade de medida é obrigatória.')
+        if not codigo:    erros.append('O código do produto é obrigatório.')
+        if not nome:      erros.append('O nome do produto é obrigatório.')
+        if not categoria: erros.append('A categoria é obrigatória.')
+        if not unidade:   erros.append('A unidade de medida é obrigatória.')
         if Produto.objects.filter(codigo__iexact=codigo).exists():
             erros.append(f'Já existe um produto com o código "{codigo}".')
 
@@ -345,13 +343,11 @@ def produto_criar(request):
             })
 
         Produto.objects.create(
-            codigo         = codigo,
-            produto        = nome,
+            codigo         = codigo, 
+            produto        = nome, 
             categoria_id   = categoria,
-            fornecedor_id  = fornecedor,
-            unidade        = unidade,
-            estoque_minimo = estoque_minimo,
-            custo_medio    = custo_medio,
+            unidade        = unidade, 
+            estoque_minimo = estoque_minimo, 
             ativo          = ativo,
         )
         messages.success(request, f'Produto "{nome}" criado com sucesso!')
@@ -382,8 +378,6 @@ def produto_editar(request, pk):
             erros.append('O nome do produto é obrigatório.')
         if not request.POST.get('categoria'):
             erros.append('A categoria é obrigatória.')
-        if not request.POST.get('fornecedor'):
-            erros.append('O fornecedor é obrigatório.')
         if Produto.objects.filter(codigo__iexact=codigo).exclude(pk=pk).exists():
             erros.append(f'Já existe outro produto com o código "{codigo}".')
 
@@ -401,10 +395,8 @@ def produto_editar(request, pk):
         produto.codigo        = codigo
         produto.produto       = nome
         produto.categoria_id  = request.POST.get('categoria')
-        produto.fornecedor_id = request.POST.get('fornecedor')
         produto.unidade       = request.POST.get('unidade')
         produto.estoque_minimo = request.POST.get('estoque_minimo', '0')
-        produto.custo_medio   = request.POST.get('custo_medio', '0')
         produto.ativo         = request.POST.get('ativo') == 'on'
         produto.save()
 
@@ -551,17 +543,30 @@ def movimentacao_criar(request):
             })
 
         # Saldo suficiente para saídas e perdas
-        if tipo in ('SAIDA', 'PERDA'):
-            if quantidade_decimal > produto.estoque_atual:
-                messages.error(
-                    request,
-                    f'Saldo insuficiente! Estoque atual de "{produto.produto}" '
-                    f'é {produto.estoque_atual} {produto.get_unidade_display()}.'
-                )
-                return render(request, 'estoque/movimentacao_form.html', {
-                    'produtos': produtos, 'fornecedores': fornecedores,
-                    'valores': request.POST,
-                })
+        
+
+            if tipo in ('SAIDA', 'PERDA'):
+                saldo_disponivel = LoteEstoque.objects.filter(
+                    produto=produto,
+                    esgotado=False,
+                ).aggregate(total=DjSum('quantidade_restante'))['total'] or Decimal('0.00')
+
+                if quantidade_decimal > saldo_disponivel:
+                    messages.error(
+                        request,
+                        f'Saldo insuficiente! Estoque disponível de '
+                        f'"{produto.produto}" é '
+                        f'{saldo_disponivel} {produto.get_unidade_display()}.'
+                    )
+                    return render(request, 'estoque/movimentacao_form.html', {
+                        'produtos': produtos, 'fornecedores': fornecedores,
+                        'valores': request.POST,
+                    })
+
+            return render(request, 'estoque/movimentacao_form.html', {
+                'produtos': produtos, 'fornecedores': fornecedores,
+                'valores': request.POST,
+            })
 
         if tipo == 'ENTRADA':
             valor_unit = Decimal(valor_unitario) if valor_unitario else Decimal('0')
@@ -639,7 +644,6 @@ def inventario_criar(request):
         produtos = Produto.objects.filter(ativo=True).order_by('produto')
         itens = []
         for produto in produtos:
-            from .models import ItemInventario
             itens.append(ItemInventario(
                 inventario    = inventario,
                 produto       = produto,
@@ -662,7 +666,6 @@ def inventario_detalhe(request, pk):
     O operador insere o saldo físico contado para cada produto.
     Após submeter, a diferença é calculada automaticamente.
     """
-    from .models import ItemInventario
     inventario = get_object_or_404(Inventario, pk=pk)
     itens      = inventario.itens.select_related('produto').order_by('produto__produto')
 
@@ -762,7 +765,28 @@ def relatorios(request):
     valor_perdas   = Sum('valor_total', filter=Q(tipo_movimentacao='PERDA')),
     )
 
-    # --- 2. Movimentações agrupadas por produto ---
+    #---2.  Calcula valor PEPS por produto (lotes activos)
+ 
+    valor_peps_por_produto = {}
+    lotes_activos = LoteEstoque.objects.filter(
+        esgotado=False,
+        produto__ativo=True,
+    ).values('produto__pk').annotate(
+        valor_peps=DjSum(
+            ExpressionWrapper(
+                F('quantidade_restante') * F('valor_unitario'),
+                 output_field=DecimalField()
+            )
+        )
+    )
+    for item in lotes_activos:
+        valor_peps_por_produto[item['produto__pk']] = item['valor_peps']
+
+    # E passa no contexto:
+    #     'valor_peps_por_produto': valor_peps_por_produto,
+   
+   
+    # --- 3. Movimentações agrupadas por produto ---
  
     produtos_mov = (
         movs.values(
@@ -785,7 +809,7 @@ def relatorios(request):
         .order_by('produto__produto')
     )
 
-    # --- 3. Produtos abaixo do mínimo ---
+    # --- 4. Produtos abaixo do mínimo ---
     produtos_qs = Produto.objects.filter(ativo=True).select_related('categoria', 'fornecedor')
     if categoria_id:
         produtos_qs = produtos_qs.filter(categoria__pk=categoria_id)
@@ -795,11 +819,13 @@ def relatorios(request):
     perdas = movs.filter(tipo_movimentacao='PERDA').order_by('-data_movimentacao')
 
     # --- Valor financeiro total do estoque ---
-    from django.db.models import F, ExpressionWrapper, DecimalField
-    valor_estoque = Produto.objects.filter(ativo=True).aggregate(
-        total=Sum(
+
+    valor_estoque = LoteEstoque.objects.filter(
+        esgotado=False,
+    ).aggregate(
+        total=DjSum(
             ExpressionWrapper(
-                F('estoque_atual') * F('custo_medio'),
+                F('quantidade_restante') * F('valor_unitario'),
                 output_field=DecimalField()
             )
         )
@@ -819,18 +845,19 @@ def relatorios(request):
     nome_mes = dict(meses).get(mes, '')
 
     return render(request, 'estoque/relatorios.html', {
-        'mes':             mes,
-        'ano':             ano,
-        'nome_mes':        nome_mes,
-        'categoria_id':    categoria_id,
-        'resumo':          resumo,
-        'produtos_mov':    produtos_mov,
-        'produtos_alerta': produtos_alerta,
-        'perdas':          perdas,
-        'valor_estoque':   valor_estoque,
-        'categorias':      categorias,
-        'anos':            anos,
-        'meses':           meses,
+        'mes':                    mes,
+        'ano':                    ano,
+        'nome_mes':               nome_mes,
+        'categoria_id':           categoria_id,
+        'resumo':                 resumo,
+        'produtos_mov':           produtos_mov,
+        'produtos_alerta':        produtos_alerta,
+        'perdas':                 perdas,
+        'valor_estoque':          valor_estoque,
+        'valor_peps_por_produto': valor_peps_por_produto,
+        'categorias':             categorias,
+        'anos':                   anos,
+        'meses':                  meses,
     })
 
     
@@ -896,7 +923,7 @@ def movimentacao_rectificar(request, pk):
         movimentacao.save()
 
         # --- Regista no Log ---
-        from .models import Log
+
         Log.objects.create(
             utilizador     = request.user,
             acao           = Log.Acao.EDICAO,
@@ -941,9 +968,6 @@ def inventario_acerto(request, pk):
     Só pode ser aplicado uma vez por inventário.
     Só funciona em inventários concluídos.
     """
-    from django.core.exceptions import PermissionDenied
-    from .models import ItemInventario
-
     if request.user.perfil != 'ADMIN':
         raise PermissionDenied
 
@@ -996,37 +1020,20 @@ def inventario_acerto(request, pk):
             movimentacoes_criadas += 1
 
         # Recalcula o saldo de cada produto afectado
-        from django.db.models import Sum
+
         for produto in produtos_afectados:
-            movs_validas = Movimentacao.objects.filter(
+            saldo = LoteEstoque.objects.filter(
                 produto=produto,
-                rectificada=False
-            ).exclude(
-                observacao__startswith='ESTORNO AUTOMÁTICO'
-            )
+                esgotado=False,
+            ).aggregate(total=DjSum('quantidade_restante'))['total'] or Decimal('0.00')
+            Produto.objects.filter(pk=produto.pk).update(estoque_atual=saldo)
 
-            entradas = movs_validas.filter(
-                tipo_movimentacao='ENTRADA'
-            ).aggregate(total=Sum('quantidade'))['total'] or Decimal('0.00')
-
-            saidas = movs_validas.filter(
-                tipo_movimentacao='SAIDA'
-            ).aggregate(total=Sum('quantidade'))['total'] or Decimal('0.00')
-
-            perdas = movs_validas.filter(
-                tipo_movimentacao='PERDA'
-            ).aggregate(total=Sum('quantidade'))['total'] or Decimal('0.00')
-
-            Produto.objects.filter(pk=produto.pk).update(
-                estoque_atual=entradas - saidas - perdas
-            )
 
         # Marca como acertado — remove o bloco duplicado que existia
         inventario.acerto_aplicado = True
         inventario.save()
 
         # Regista no Log
-        from .models import Log
         Log.objects.create(
             utilizador     = request.user,
             acao           = Log.Acao.EDICAO,

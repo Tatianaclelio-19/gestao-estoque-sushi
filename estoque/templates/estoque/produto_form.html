@@ -61,22 +61,7 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label for="fornecedor" class="form-label fw-semibold">
-                                Fornecedor <span class="text-danger">*</span>
-                            </label>
-                            <select class="form-select" id="fornecedor" name="fornecedor" required>
-                                <option value="">Selecionar fornecedor...</option>
-                                {% for f in fornecedores %}
-                                    <option value="{{ f.pk }}"
-                                        {% if produto.fornecedor_id == f.pk %}selected
-                                        {% elif valores.fornecedor == f.pk|stringformat:"s" %}selected
-                                        {% endif %}>
-                                        {{ f.fornecedor }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
+                        
                     </div>
 
                     <!-- Linha 3: Unidade + Estoque Mínimo + Custo Médio -->
@@ -102,16 +87,6 @@
                                    name="estoque_minimo" min="0" step="0.01"
                                    value="{% if produto %}{{ produto.estoque_minimo }}{% elif valores %}{{ valores.estoque_minimo}}{% endif %}">
                             <div class="form-text">Quantidade mínima antes do alerta.</div>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="custo_medio" class="form-label fw-semibold">
-                                Custo Médio (Kz)
-                            </label>
-                            <input type="number" class="form-control" id="custo_medio"
-                                   name="custo_medio" min="0" step="0.01"
-                                   value="{% if produto %}{{ objeto.custo_medio }}{% elif valores %}{{ valores.custo_medio }}{% endif %}">
-
-                            <div class="form-text">Valor médio de compra por unidade.</div>
                         </div>
                     </div>
 
