@@ -783,10 +783,7 @@ def relatorios(request):
     for item in lotes_activos:
         valor_peps_por_produto[item['produto__pk']] = item['valor_peps']
 
-    # E passa no contexto:
-    #     'valor_peps_por_produto': valor_peps_por_produto,
-   
-   
+       
     # --- 3. Movimentações agrupadas por produto ---
  
     produtos_mov = (
