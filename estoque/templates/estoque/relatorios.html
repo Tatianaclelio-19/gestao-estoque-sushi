@@ -1,5 +1,8 @@
 {% extends 'estoque/base.html' %}
 
+{% extends 'estoque/base.html' %}
+{% load estoque_extras %}    ← adiciona esta linha
+
 {% block title %}Relatórios{% endblock %}
 {% block page_title %}Relatórios{% endblock %}
 
@@ -334,12 +337,13 @@
                             {{ p.produto__estoque_atual|floatformat:3 }}
                         </td>
                         <td class="text-end text-muted">
-                            {% if p.produto__custo_medio %}
-                                {% widthratio p.produto__estoque_atual 1 p.produto__custo_medio as val_est %}
-                                {{ val_est|floatformat:2 }} €
-                            {% else %}
-                                —
-                            {% endif %}
+                            {% with valor_peps=valor_peps_por_produto|get_item:p.produto__pk %}
+                                {% if valor_peps %}
+                                    {{ valor_peps|floatformat:2 }} €
+                                {% else %}
+                                    —
+                                {% endif %}
+                            {% endwith %}
                         </td>
                     </tr>
                     {% endfor %}

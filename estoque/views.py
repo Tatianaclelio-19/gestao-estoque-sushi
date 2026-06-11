@@ -768,17 +768,20 @@ def relatorios(request):
 
     #---2.  Calcula valor PEPS por produto (lotes activos)
  
-    lote_valor = LoteEstoque.objects.filter(
-        produto=OuterRef('produto__pk'),
+    valor_peps_por_produto = {}
+    lotes_activos = LoteEstoque.objects.filter(
         esgotado=False,
-    ).values('produto').annotate(
-        total=DjSum(
+        produto__ativo=True,
+    ).values('produto__pk').annotate(
+        valor_peps=DjSum(
             ExpressionWrapper(
                 F('quantidade_restante') * F('valor_unitario'),
                 output_field=DecimalField()
             )
         )
-    ).values('total')
+    )
+    for item in lotes_activos:
+        valor_peps_por_produto[item['produto__pk']] = item['valor_peps']
 
     # E passa no contexto:
     #     'valor_peps_por_produto': valor_peps_por_produto,
