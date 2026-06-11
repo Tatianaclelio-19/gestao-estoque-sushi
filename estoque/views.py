@@ -3,6 +3,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Sum, Q, Count, F, ExpressionWrapper, DecimalField
+from django.db.models import OuterRef, Subquery
 from django.db.models import Sum as DjSum
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
@@ -767,20 +768,17 @@ def relatorios(request):
 
     #---2.  Calcula valor PEPS por produto (lotes activos)
  
-    valor_peps_por_produto = {}
-    lotes_activos = LoteEstoque.objects.filter(
+    lote_valor = LoteEstoque.objects.filter(
+        produto=OuterRef('produto__pk'),
         esgotado=False,
-        produto__ativo=True,
-    ).values('produto__pk').annotate(
-        valor_peps=DjSum(
+    ).values('produto').annotate(
+        total=DjSum(
             ExpressionWrapper(
                 F('quantidade_restante') * F('valor_unitario'),
-                 output_field=DecimalField()
+                output_field=DecimalField()
             )
         )
-    )
-    for item in lotes_activos:
-        valor_peps_por_produto[item['produto__pk']] = item['valor_peps']
+    ).values('total')
 
     # E passa no contexto:
     #     'valor_peps_por_produto': valor_peps_por_produto,
@@ -789,24 +787,24 @@ def relatorios(request):
     # --- 3. Movimentações agrupadas por produto ---
  
     produtos_mov = (
-        movs.values(
-            'produto__pk',
-            'produto__produto',
-            'produto__codigo',
-            'produto__categoria__categoria',
-            'produto__unidade',
-            'produto__estoque_atual',
-            'produto__estoque_minimo',
-            'produto__custo_medio',
-        )
-        .annotate(
-            qtd_entradas = Sum('quantidade', filter=Q(tipo_movimentacao='ENTRADA')),
-            qtd_saidas   = Sum('quantidade', filter=Q(tipo_movimentacao='SAIDA')),
-            qtd_perdas   = Sum('quantidade', filter=Q(tipo_movimentacao='PERDA')),
-            val_total    = Sum('valor_total'),
-            n_movs       = Count('pk'),
-        )
-        .order_by('produto__produto')
+    movs.values(
+        'produto__pk',
+        'produto__produto',
+        'produto__codigo',
+        'produto__categoria__categoria',
+        'produto__unidade',
+        'produto__estoque_atual',
+        'produto__estoque_minimo',
+        'produto__custo_medio',
+    )
+    .annotate(
+        qtd_entradas = DjSum('quantidade', filter=Q(tipo_movimentacao='ENTRADA')),
+        qtd_saidas   = DjSum('quantidade', filter=Q(tipo_movimentacao='SAIDA')),
+        qtd_perdas   = DjSum('quantidade', filter=Q(tipo_movimentacao='PERDA')),
+        val_total    = DjSum('valor_total'),
+        n_movs       = Count('pk'),
+    )
+    .order_by('produto__produto')
     )
 
     # --- 4. Produtos abaixo do mínimo ---
